@@ -9,362 +9,618 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  * { -webkit-tap-highlight-color: transparent; }
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
   body { margin: 0; background: #F0F4FF; }
-  select, input, textarea { appearance: none; -webkit-appearance: none; }
+  select, input, textarea { appearance: none; -webkit-appearance: none; font-family: inherit; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState } = React;
+const { useState, useCallback } = React;
 
-const ALMACENES=["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","D1 - Multicentro","Ara - Sur","Olímpica Ibagué"];
-const MERCS=[{id:1,nombre:"Laura Gómez",almacen:"Éxito Ibagué Centro"},{id:2,nombre:"Carlos Ríos",almacen:"Jumbo Ibagué"},{id:3,nombre:"María Suárez",almacen:"Carulla La Estación"},{id:4,nombre:"Andrés Mora",almacen:"Mercacentro No. 10"}];
-const PRODS=["Atún en Lata 170g","Sardinas en Tomate 425g","Filete de Tilapia 500g","Camarones Pelados 400g","Calamar en Anillos 250g","Mariscos Mixtos 300g","Mejillones 200g","Bacalao Salado 500g"];
-const COMP=["Van Camps","Isabel","Corona","Calypso","Rica"];
-const HOY=()=>new Date().toISOString().split("T")[0];
-const HORA=()=>new Date().toTimeString().slice(0,5);
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4wckYrTj2QaR3rwKxTsUWBthw21fftT3TAOBBfWXrd4133LgwhUgcU81ZQUFglCCDtg/exec";
 
-const S={
-  btn:"width:100%;font-weight:700;padding:12px;border-radius:12px;font-size:14px;transition:all 0.15s;border:none;cursor:pointer;",
-};
+const ALMACENES = ["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","D1 - Multicentro","Ara - Sur","Olímpica Ibagué"];
+const MERCS = [{id:1,nombre:"Laura Gómez",almacen:"Éxito Ibagué Centro"},{id:2,nombre:"Carlos Ríos",almacen:"Jumbo Ibagué"},{id:3,nombre:"María Suárez",almacen:"Carulla La Estación"},{id:4,nombre:"Andrés Mora",almacen:"Mercacentro No. 10"}];
+const PRODS = ["Atún en Lata 170g","Sardinas en Tomate 425g","Filete de Tilapia 500g","Camarones Pelados 400g","Calamar en Anillos 250g","Mariscos Mixtos 300g","Mejillones 200g","Bacalao Salado 500g"];
+const COMP = ["Van Camps","Isabel","Corona","Calypso","Rica"];
+const HOY = () => new Date().toISOString().split("T")[0];
+const HORA = () => new Date().toTimeString().slice(0,5);
 
-function Field({label,type="text",value,onChange,options,rows=3}){
-  const cls={background:"#F0F4FF",border:"none",borderRadius:"12px",padding:"10px 14px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none",color:"#1a2240",fontFamily:"inherit"};
+// ── ENVIAR A GOOGLE SHEETS ─────────────────────────────────────────────────
+async function enviarASheets(modulo, campos) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ modulo, campos })
+    });
+    return true;
+  } catch(e) {
+    console.error("Error enviando a Sheets:", e);
+    return false;
+  }
+}
+
+// ── COMPONENTES BASE ───────────────────────────────────────────────────────
+function Field({label, type="text", value, onChange, options, rows=3}) {
+  const css = {background:"#F0F4FF",border:"none",borderRadius:"12px",padding:"10px 14px",fontSize:"14px",width:"100%",outline:"none",color:"#1a2240",fontFamily:"inherit"};
   return (
     <div style={{marginBottom:"12px"}}>
       {label && <label style={{fontSize:"11px",fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.06em",color:"#3B6FE8",display:"block",marginBottom:"4px"}}>{label}</label>}
       {type==="select"
-        ? <select value={value} onChange={onChange} style={cls}>
+        ? <select value={value} onChange={onChange} style={css}>
             <option value="">— Seleccionar —</option>
-            {options.map(o=><option key={o} value={o}>{o}</option>)}
+            {options.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         : type==="textarea"
-        ? <textarea value={value} onChange={onChange} rows={rows} style={cls}/>
-        : <input type={type} value={value} onChange={onChange} style={cls}/>
+        ? <textarea value={value} onChange={onChange} rows={rows} style={css}/>
+        : <input type={type} value={value} onChange={onChange} style={css}/>
       }
     </div>
   );
 }
 
-function Tag({color,children}){
-  const c={
-    green:{background:"#DCFCE7",color:"#166534"},
-    red:{background:"#FEE2E2",color:"#991B1B"},
-    blue:{background:"#DBEAFE",color:"#1E40AF"},
-    orange:{background:"#FFEDD5",color:"#9A3412"},
-    yellow:{background:"#FEF9C3",color:"#854D0E"},
-    teal:{background:"#CCFBF1",color:"#0F766E"},
+function Tag({color, children}) {
+  const c = {
+    green:{background:"#DCFCE7",color:"#166534"},red:{background:"#FEE2E2",color:"#991B1B"},
+    blue:{background:"#DBEAFE",color:"#1E40AF"},orange:{background:"#FFEDD5",color:"#9A3412"},
+    yellow:{background:"#FEF9C3",color:"#854D0E"},teal:{background:"#CCFBF1",color:"#0F766E"},
     gray:{background:"#F1F5F9",color:"#475569"},
   };
-  const s=c[color]||c.gray;
+  const s = c[color]||c.gray;
   return <span style={{...s,fontSize:"11px",fontWeight:"700",padding:"3px 10px",borderRadius:"9999px",whiteSpace:"nowrap"}}>{children}</span>;
 }
 
-function Btn({onClick,gradient,shadow,children}){
-  return <button onClick={onClick} style={{width:"100%",fontWeight:"700",padding:"14px",borderRadius:"12px",fontSize:"14px",border:"none",cursor:"pointer",background:gradient,color:"white",boxShadow:shadow,transition:"all 0.15s",fontFamily:"inherit"}}
-    onMouseDown={e=>e.currentTarget.style.transform="scale(0.97)"}
-    onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
-    onTouchStart={e=>e.currentTarget.style.transform="scale(0.97)"}
-    onTouchEnd={e=>e.currentTarget.style.transform="scale(1)"}
-  >{children}</button>;
+function Btn({onClick, gradient, shadow, children, loading}) {
+  return (
+    <button onClick={onClick} disabled={loading}
+      style={{width:"100%",fontWeight:"700",padding:"14px",borderRadius:"12px",fontSize:"14px",border:"none",cursor:loading?"not-allowed":"pointer",background:loading?"#CBD5E1":gradient,color:"white",boxShadow:loading?"none":shadow,transition:"all 0.15s",fontFamily:"inherit",opacity:loading?0.7:1}}
+      onMouseDown={e=>!loading&&(e.currentTarget.style.transform="scale(0.97)")}
+      onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
+      onTouchStart={e=>!loading&&(e.currentTarget.style.transform="scale(0.97)")}
+      onTouchEnd={e=>e.currentTarget.style.transform="scale(1)"}
+    >
+      {loading ? "⏳ Guardando en Sheets..." : children}
+    </button>
+  );
 }
 
-function Card({children,style={}}){
+function Card({children, style={}}) {
   return <div style={{background:"white",borderRadius:"16px",padding:"16px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8",marginBottom:"12px",...style}}>{children}</div>;
 }
 
-function SectionHead({gradient,title,sub}){
-  return <div style={{background:gradient,borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
-    <div style={{position:"absolute",top:"-30px",right:"-30px",width:"120px",height:"120px",background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
-    <h2 style={{color:"white",fontWeight:"900",fontSize:"22px",margin:"0 0 4px 0"}}>{title}</h2>
-    <p style={{color:"rgba(255,255,255,0.7)",fontSize:"12px",margin:0}}>{sub}</p>
-  </div>;
-}
-
-function Checkbox({checked,onChange,label,activeColor="#16A34A",activeBg="#DCFCE7",activeBorder="#16A34A"}){
-  return <div onClick={()=>onChange(!checked)} style={{display:"flex",alignItems:"center",gap:"12px",borderRadius:"12px",padding:"12px",marginBottom:"12px",cursor:"pointer",background:checked?activeBg:"#F0F4FF",border:`2px solid ${checked?activeBorder:"transparent"}`,transition:"all 0.15s"}}>
-    <div style={{width:"20px",height:"20px",borderRadius:"6px",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:checked?activeColor:"white",border:checked?"none":"2px solid #CBD5E1",transition:"all 0.15s"}}>
-      {checked&&<span style={{color:"white",fontSize:"11px",fontWeight:"900"}}>✓</span>}
+function SectionHead({gradient, title, sub}) {
+  return (
+    <div style={{background:gradient,borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:"-30px",right:"-30px",width:"120px",height:"120px",background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
+      <h2 style={{color:"white",fontWeight:"900",fontSize:"22px",margin:"0 0 4px 0",position:"relative",zIndex:1}}>{title}</h2>
+      <p style={{color:"rgba(255,255,255,0.7)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>{sub}</p>
     </div>
-    <span style={{fontSize:"14px",fontWeight:"600",color:checked?"#166534":"#475569"}}>{label}</span>
-  </div>;
+  );
 }
 
-function StatCard({icon,value,label,gradient}){
-  return <div style={{background:gradient,borderRadius:"16px",padding:"14px",color:"white"}}>
-    <div style={{fontSize:"24px",marginBottom:"4px"}}>{icon}</div>
-    <div style={{fontSize:"32px",fontWeight:"900",lineHeight:1}}>{value}</div>
-    <div style={{fontSize:"11px",fontWeight:"600",opacity:0.85,marginTop:"4px",lineHeight:"1.3"}}>{label}</div>
-  </div>;
+function Checkbox({checked, onChange, label, activeColor="#16A34A", activeBg="#DCFCE7", activeBorder="#16A34A"}) {
+  return (
+    <div onClick={()=>onChange(!checked)} style={{display:"flex",alignItems:"center",gap:"12px",borderRadius:"12px",padding:"12px",marginBottom:"12px",cursor:"pointer",background:checked?activeBg:"#F0F4FF",border:`2px solid ${checked?activeBorder:"transparent"}`,transition:"all 0.15s"}}>
+      <div style={{width:"20px",height:"20px",borderRadius:"6px",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:checked?activeColor:"white",border:checked?"none":"2px solid #CBD5E1",transition:"all 0.15s"}}>
+        {checked && <span style={{color:"white",fontSize:"11px",fontWeight:"900"}}>✓</span>}
+      </div>
+      <span style={{fontSize:"14px",fontWeight:"600",color:checked?"#166534":"#475569"}}>{label}</span>
+    </div>
+  );
 }
 
-function Dashboard({as,ac,pr,inv,av}){
-  const h=HOY();
-  const alertas=inv.filter(r=>r.stockMin&&Number(r.stock)<=Number(r.stockMin));
-  return <div>
-    <div style={{background:"linear-gradient(135deg,#0F2167,#1a3a8f,#0f4c8f)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:"-32px",right:"-32px",width:"128px",height:"128px",background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
-      <div style={{position:"absolute",bottom:"-16px",left:"-16px",width:"80px",height:"80px",background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative",zIndex:1}}>
+function Toast({msg, ok}) {
+  if (!msg) return null;
+  return (
+    <div style={{position:"fixed",top:"16px",left:"50%",transform:"translateX(-50%)",background:ok?"#166534":"#991B1B",color:"white",padding:"10px 20px",borderRadius:"12px",fontSize:"13px",fontWeight:"700",zIndex:999,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",whiteSpace:"nowrap"}}>
+      {ok?"✅":"❌"} {msg}
+    </div>
+  );
+}
+
+function StatCard({icon, value, label, gradient}) {
+  return (
+    <div style={{background:gradient,borderRadius:"16px",padding:"14px",color:"white"}}>
+      <div style={{fontSize:"24px",marginBottom:"4px"}}>{icon}</div>
+      <div style={{fontSize:"32px",fontWeight:"900",lineHeight:1}}>{value}</div>
+      <div style={{fontSize:"11px",fontWeight:"600",opacity:0.85,marginTop:"4px",lineHeight:"1.3"}}>{label}</div>
+    </div>
+  );
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function Dashboard({as, ac, pr, inv, av}) {
+  const h = HOY();
+  const alertas = inv.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
+  return (
+    <div>
+      <div style={{background:"linear-gradient(135deg,#0F2167,#1a3a8f,#0f4c8f)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:"-32px",right:"-32px",width:"128px",height:"128px",background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative",zIndex:1}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
+              <span style={{fontSize:"28px"}}>🐟</span>
+              <span style={{color:"white",fontWeight:"900",fontSize:"20px"}}>UNIMARES</span>
+            </div>
+            <p style={{color:"#93C5FD",fontSize:"12px",margin:"0 0 2px 0",fontWeight:"500"}}>Gestión Mercaderistas · Ibagué</p>
+            <p style={{color:"#60A5FA",fontSize:"11px",margin:0}}>{new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"})}</p>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.12)",borderRadius:"14px",padding:"10px 16px",textAlign:"center"}}>
+            <div style={{color:"white",fontWeight:"900",fontSize:"28px",lineHeight:1}}>{as.filter(r=>r.fecha===h).length}</div>
+            <div style={{color:"#93C5FD",fontSize:"10px",fontWeight:"600",marginTop:"2px"}}>presentes</div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginTop:"16px",position:"relative",zIndex:1}}>
+          {[["📸",ac.filter(r=>r.fecha===h).length,"Actividades"],["💰",pr.filter(r=>r.fecha===h).length,"Precios"],["⚠️",av.filter(r=>r.fecha===h).length,"Averías"]].map(([i,v,l])=>
+            <div key={l} style={{background:"rgba(255,255,255,0.12)",borderRadius:"12px",padding:"10px",textAlign:"center"}}>
+              <div style={{fontSize:"20px"}}>{i}</div>
+              <div style={{color:"white",fontWeight:"900",fontSize:"22px",lineHeight:1}}>{v}</div>
+              <div style={{color:"rgba(255,255,255,0.7)",fontSize:"10px",marginTop:"2px"}}>{l}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+        <StatCard icon="🕐" value={as.filter(r=>r.fecha===h).length} label="Asistencias hoy" gradient="linear-gradient(135deg,#3B6FE8,#2952C0)"/>
+        <StatCard icon="📦" value={inv.filter(r=>r.fecha===h).length} label="Inventarios hoy" gradient="linear-gradient(135deg,#6366F1,#4F46E5)"/>
+        <StatCard icon="🔔" value={alertas.length} label="Alertas stock bajo" gradient={alertas.length>0?"linear-gradient(135deg,#EF4444,#DC2626)":"linear-gradient(135deg,#0D9488,#0F766E)"}/>
+        <StatCard icon="📊" value={ac.length} label="Total actividades" gradient="linear-gradient(135deg,#F97316,#EA580C)"/>
+      </div>
+
+      <div style={{background:"#E0F2FE",border:"1px solid #BAE6FD",borderRadius:"16px",padding:"12px 16px",marginBottom:"12px",display:"flex",alignItems:"center",gap:"10px"}}>
+        <span style={{fontSize:"20px"}}>📊</span>
         <div>
-          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-            <span style={{fontSize:"28px"}}>🐟</span>
-            <span style={{color:"white",fontWeight:"900",fontSize:"20px",letterSpacing:"-0.5px"}}>UNIMARES</span>
-          </div>
-          <p style={{color:"#93C5FD",fontSize:"12px",margin:"0 0 2px 0",fontWeight:"500"}}>Gestión Mercaderistas · Ibagué</p>
-          <p style={{color:"#60A5FA",fontSize:"11px",margin:0}}>{new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"})}</p>
-        </div>
-        <div style={{background:"rgba(255,255,255,0.12)",backdropFilter:"blur(8px)",borderRadius:"14px",padding:"10px 16px",textAlign:"center"}}>
-          <div style={{color:"white",fontWeight:"900",fontSize:"28px",lineHeight:1}}>{as.filter(r=>r.fecha===h).length}</div>
-          <div style={{color:"#93C5FD",fontSize:"10px",fontWeight:"600",marginTop:"2px"}}>presentes</div>
+          <p style={{margin:0,fontSize:"12px",fontWeight:"700",color:"#0369A1"}}>Datos guardados en Google Sheets</p>
+          <p style={{margin:0,fontSize:"11px",color:"#0284C7"}}>Cada registro se envía automáticamente a tu hoja de cálculo</p>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginTop:"16px",position:"relative",zIndex:1}}>
-        {[["📸",ac.filter(r=>r.fecha===h).length,"Actividades"],["💰",pr.filter(r=>r.fecha===h).length,"Precios"],["⚠️",av.filter(r=>r.fecha===h).length,"Averías"]].map(([i,v,l])=>
-          <div key={l} style={{background:"rgba(255,255,255,0.12)",borderRadius:"12px",padding:"10px",textAlign:"center"}}>
-            <div style={{fontSize:"20px"}}>{i}</div>
-            <div style={{color:"white",fontWeight:"900",fontSize:"22px",lineHeight:1}}>{v}</div>
-            <div style={{color:"rgba(255,255,255,0.7)",fontSize:"10px",marginTop:"2px"}}>{l}</div>
-          </div>
-        )}
-      </div>
-    </div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-      <StatCard icon="🕐" value={as.filter(r=>r.fecha===h).length} label="Asistencias hoy" gradient="linear-gradient(135deg,#3B6FE8,#2952C0)"/>
-      <StatCard icon="📦" value={inv.filter(r=>r.fecha===h).length} label="Inventarios hoy" gradient="linear-gradient(135deg,#6366F1,#4F46E5)"/>
-      <StatCard icon="🔔" value={alertas.length} label="Alertas stock bajo" gradient={alertas.length>0?"linear-gradient(135deg,#EF4444,#DC2626)":"linear-gradient(135deg,#0D9488,#0F766E)"}/>
-      <StatCard icon="📊" value={ac.length} label="Total actividades" gradient="linear-gradient(135deg,#F97316,#EA580C)"/>
-    </div>
-    <Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo hoy</h3>
-      {MERCS.map(m=>{
-        const a=as.find(r=>r.merc===m.nombre&&r.fecha===h);
-        const nA=ac.filter(r=>r.merc===m.nombre&&r.fecha===h).length;
-        return <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
-          <div><p style={{fontWeight:"700",fontSize:"14px",color:"#1a2240",margin:"0 0 2px 0"}}>{m.nombre}</p><p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{m.almacen}</p></div>
-          <div style={{display:"flex",gap:"6px",alignItems:"center"}}><Tag color="blue">{nA} act.</Tag><Tag color={a?"green":"red"}>{a?"✓ Pres.":"Ausente"}</Tag></div>
-        </div>;
-      })}
-    </Card>
-    {alertas.length>0&&<div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
-      <p style={{color:"#9A3412",fontWeight:"900",fontSize:"13px",margin:"0 0 10px 0"}}>🔔 Alertas de Stock Bajo</p>
-      {alertas.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(254,215,170,0.5)"}}>
-        <span style={{fontSize:"12px",color:"#C2410C",fontWeight:"500"}}>{r.prod} · {r.almacen}</span>
-        <span style={{fontSize:"12px",fontWeight:"900",color:"#991B1B"}}>{r.stock}/{r.stockMin}</span>
-      </div>)}
-    </div>}
-    <Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>📈 Acumulado Total</h3>
-      {[["Asistencias totales",as.length],["Actividades totales",ac.length],["Vs Competencia",ac.filter(a=>a.esComp).length],["Chequeos de precios",pr.length],["Inventarios cíclicos",inv.length],["Averías registradas",av.length]].map(([l,v])=>
-        <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F0F4FF"}}>
-          <span style={{fontSize:"13px",color:"#475569"}}>{l}</span>
-          <span style={{fontWeight:"900",color:"#0F2167",fontSize:"14px"}}>{v}</span>
+
+      <Card>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo hoy</h3>
+        {MERCS.map(m => {
+          const a = as.find(r => r.merc===m.nombre && r.fecha===h);
+          const nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
+          return (
+            <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+              <div>
+                <p style={{fontWeight:"700",fontSize:"14px",color:"#1a2240",margin:"0 0 2px 0"}}>{m.nombre}</p>
+                <p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{m.almacen}</p>
+              </div>
+              <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                <Tag color="blue">{nA} act.</Tag>
+                <Tag color={a?"green":"red"}>{a?"✓ Pres.":"Ausente"}</Tag>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {alertas.length > 0 && (
+        <div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
+          <p style={{color:"#9A3412",fontWeight:"900",fontSize:"13px",margin:"0 0 10px 0"}}>🔔 Alertas de Stock Bajo</p>
+          {alertas.map(r => (
+            <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(254,215,170,0.5)"}}>
+              <span style={{fontSize:"12px",color:"#C2410C",fontWeight:"500"}}>{r.prod} · {r.almacen}</span>
+              <span style={{fontSize:"12px",fontWeight:"900",color:"#991B1B"}}>{r.stock}/{r.stockMin}</span>
+            </div>
+          ))}
         </div>
       )}
-    </Card>
-  </div>;
+
+      <Card>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>📈 Acumulado Total</h3>
+        {[["Asistencias totales",as.length],["Actividades totales",ac.length],["Vs Competencia",ac.filter(a=>a.esComp).length],["Chequeos de precios",pr.length],["Inventarios cíclicos",inv.length],["Averías registradas",av.length]].map(([l,v]) =>
+          <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F0F4FF"}}>
+            <span style={{fontSize:"13px",color:"#475569"}}>{l}</span>
+            <span style={{fontWeight:"900",color:"#0F2167",fontSize:"14px"}}>{v}</span>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
 }
 
-function Asistencia({data,setData}){
-  const [f,setF]=useState({merc:"",almacen:"",fecha:HOY(),entrada:HORA(),salida:"",firma:false,obs:""});
-  const save=()=>{if(!f.merc||!f.almacen)return alert("Selecciona mercaderista y almacén.");setData(p=>[...p,{...f,id:Date.now()}]);setF({merc:"",almacen:"",fecha:HOY(),entrada:HORA(),salida:"",firma:false,obs:""});alert("✅ Asistencia registrada.");};
-  const hoy=data.filter(r=>r.fecha===HOY());
-  return <div>
-    <SectionHead gradient="linear-gradient(135deg,#0F2167,#1E3A8A)" title="🕐 Asistencia" sub="Registro de horarios de gestión"/>
-    <Card>
-      <Field label="Mercaderista *" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
-      <Field label="Almacén *" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-        <Field label="Hora Entrada" type="time" value={f.entrada} onChange={e=>setF({...f,entrada:e.target.value})}/>
-        <Field label="Hora Salida" type="time" value={f.salida} onChange={e=>setF({...f,salida:e.target.value})}/>
-      </div>
-      <Checkbox checked={f.firma} onChange={v=>setF({...f,firma:v})} label="✍️ Confirmar firma de asistencia"/>
-      <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
-      <Btn onClick={save} gradient="linear-gradient(135deg,#3B6FE8,#2952C0)" shadow="0 4px 15px rgba(59,111,232,0.35)">Registrar Asistencia</Btn>
-    </Card>
-    {hoy.length>0&&<Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Hoy — {hoy.length} registros</h3>
-      {hoy.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
-        <div><p style={{fontWeight:"700",fontSize:"14px",color:"#1a2240",margin:"0 0 2px 0"}}>{r.merc}</p><p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{r.almacen} · {r.entrada}→{r.salida||"—"}</p></div>
-        <Tag color={r.firma?"green":"yellow"}>{r.firma?"Firmado ✓":"Sin firma"}</Tag>
-      </div>)}
-    </Card>}
-  </div>;
+// ── ASISTENCIA ─────────────────────────────────────────────────────────────
+function Asistencia({data, setData}) {
+  const [f, setF] = useState({merc:"",almacen:"",fecha:HOY(),entrada:HORA(),salida:"",firma:false,obs:""});
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
+
+  const save = async () => {
+    if (!f.merc || !f.almacen) return showToast("Selecciona mercaderista y almacén", false);
+    setLoading(true);
+    const campos = {
+      Fecha: f.fecha, Mercaderista: f.merc, Almacen: f.almacen,
+      HoraEntrada: f.entrada, HoraSalida: f.salida||"—",
+      Firma: f.firma?"Sí":"No", Observaciones: f.obs, Timestamp: new Date().toISOString()
+    };
+    const ok = await enviarASheets("Asistencia", campos);
+    setLoading(false);
+    if (ok) {
+      setData(p => [...p, {...f, id:Date.now()}]);
+      setF({merc:"",almacen:"",fecha:HOY(),entrada:HORA(),salida:"",firma:false,obs:""});
+      showToast("Guardado en Google Sheets ✓", true);
+    } else {
+      showToast("Error al guardar. Intenta de nuevo.", false);
+    }
+  };
+
+  const hoy = data.filter(r => r.fecha===HOY());
+  return (
+    <div>
+      {toast && <Toast msg={toast.msg} ok={toast.ok}/>}
+      <SectionHead gradient="linear-gradient(135deg,#0F2167,#1E3A8A)" title="🕐 Asistencia" sub="Registro de horarios de gestión"/>
+      <Card>
+        <Field label="Mercaderista *" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
+        <Field label="Almacén *" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+          <Field label="Hora Entrada" type="time" value={f.entrada} onChange={e=>setF({...f,entrada:e.target.value})}/>
+          <Field label="Hora Salida" type="time" value={f.salida} onChange={e=>setF({...f,salida:e.target.value})}/>
+        </div>
+        <Checkbox checked={f.firma} onChange={v=>setF({...f,firma:v})} label="✍️ Confirmar firma de asistencia"/>
+        <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
+        <Btn onClick={save} loading={loading} gradient="linear-gradient(135deg,#3B6FE8,#2952C0)" shadow="0 4px 15px rgba(59,111,232,0.35)">Registrar Asistencia → Sheets</Btn>
+      </Card>
+      {hoy.length > 0 && (
+        <Card>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Hoy — {hoy.length} registros</h3>
+          {hoy.map(r => (
+            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+              <div>
+                <p style={{fontWeight:"700",fontSize:"14px",color:"#1a2240",margin:"0 0 2px 0"}}>{r.merc}</p>
+                <p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{r.almacen} · {r.entrada}→{r.salida||"—"}</p>
+              </div>
+              <Tag color={r.firma?"green":"yellow"}>{r.firma?"Firmado ✓":"Sin firma"}</Tag>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
 }
 
-function Actividades({data,setData}){
-  const TIPOS=["Surtido de producto","Exhibición / Visibilidad","Planograma","Evacuación producto","Material POP","Degustación","Rotación FIFO","Bloqueo góndola","Otro"];
-  const [f,setF]=useState({merc:"",almacen:"",fecha:HOY(),hora:HORA(),tipo:"",desc:"",esComp:false,marcaComp:"",foto:false});
-  const save=()=>{if(!f.merc||!f.tipo)return alert("Selecciona mercaderista y tipo de actividad.");setData(p=>[...p,{...f,id:Date.now()}]);setF({merc:"",almacen:"",fecha:HOY(),hora:HORA(),tipo:"",desc:"",esComp:false,marcaComp:"",foto:false});alert("✅ Actividad registrada.");};
-  return <div>
-    <SectionHead gradient="linear-gradient(135deg,#EA580C,#C2410C)" title="📸 Actividades" sub="Merchandising, visibilidad y evacuación"/>
-    <Card>
-      <Field label="Mercaderista *" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
-      <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
-      <Field label="Tipo de Actividad *" type="select" value={f.tipo} onChange={e=>setF({...f,tipo:e.target.value})} options={TIPOS}/>
-      <Checkbox checked={f.esComp} onChange={v=>setF({...f,esComp:v})} label="🏷️ Actividad de la competencia" activeColor="#F97316" activeBg="#FFEDD5" activeBorder="#F97316"/>
-      {f.esComp&&<Field label="Marca competencia" type="select" value={f.marcaComp} onChange={e=>setF({...f,marcaComp:e.target.value})} options={COMP}/>}
-      <Field label="Descripción / Notas" type="textarea" value={f.desc} onChange={e=>setF({...f,desc:e.target.value})} rows={2}/>
-      <div onClick={()=>setF({...f,foto:!f.foto})} style={{border:`2px dashed ${f.foto?"#16A34A":"#CBD5E1"}`,borderRadius:"12px",padding:"16px",textAlign:"center",marginBottom:"12px",cursor:"pointer",background:f.foto?"#DCFCE7":"#F8FAFF",transition:"all 0.15s"}}>
-        <span style={{fontSize:"28px"}}>{f.foto?"✅":"📷"}</span>
-        <p style={{fontSize:"12px",fontWeight:"600",margin:"4px 0 0 0",color:f.foto?"#166534":"#94A3B8"}}>{f.foto?"Foto adjuntada — toca para quitar":"Toca para adjuntar foto"}</p>
-      </div>
-      <Btn onClick={save} gradient="linear-gradient(135deg,#F97316,#EA580C)" shadow="0 4px 15px rgba(249,115,22,0.35)">Guardar Actividad</Btn>
-    </Card>
-    {data.length>0&&<Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Últimas {Math.min(data.length,5)} actividades</h3>
-      {data.slice(-5).reverse().map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
-        <div style={{flex:1,marginRight:"8px"}}><p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:"0 0 2px 0"}}>{r.tipo}</p><p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{r.merc} · {r.almacen}</p></div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}><Tag color={r.esComp?"orange":"blue"}>{r.esComp?r.marcaComp:"Unimares"}</Tag>{r.foto&&<Tag color="green">📷 foto</Tag>}</div>
-      </div>)}
-    </Card>}
-  </div>;
+// ── ACTIVIDADES ────────────────────────────────────────────────────────────
+function Actividades({data, setData}) {
+  const TIPOS = ["Surtido de producto","Exhibición / Visibilidad","Planograma","Evacuación producto","Material POP","Degustación","Rotación FIFO","Bloqueo góndola","Otro"];
+  const [f, setF] = useState({merc:"",almacen:"",fecha:HOY(),hora:HORA(),tipo:"",desc:"",esComp:false,marcaComp:"",foto:false});
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
+
+  const save = async () => {
+    if (!f.merc || !f.tipo) return showToast("Selecciona mercaderista y tipo de actividad", false);
+    setLoading(true);
+    const campos = {
+      Fecha: f.fecha, Hora: f.hora, Mercaderista: f.merc, Almacen: f.almacen,
+      TipoActividad: f.tipo, Descripcion: f.desc,
+      EsCompetencia: f.esComp?"Sí":"No", MarcaCompetencia: f.marcaComp||"—",
+      FotoAdjunta: f.foto?"Sí":"No", Timestamp: new Date().toISOString()
+    };
+    const ok = await enviarASheets("Actividades", campos);
+    setLoading(false);
+    if (ok) {
+      setData(p => [...p, {...f, id:Date.now()}]);
+      setF({merc:"",almacen:"",fecha:HOY(),hora:HORA(),tipo:"",desc:"",esComp:false,marcaComp:"",foto:false});
+      showToast("Guardado en Google Sheets ✓", true);
+    } else showToast("Error al guardar. Intenta de nuevo.", false);
+  };
+
+  return (
+    <div>
+      {toast && <Toast msg={toast.msg} ok={toast.ok}/>}
+      <SectionHead gradient="linear-gradient(135deg,#EA580C,#C2410C)" title="📸 Actividades" sub="Merchandising, visibilidad y evacuación"/>
+      <Card>
+        <Field label="Mercaderista *" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
+        <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
+        <Field label="Tipo de Actividad *" type="select" value={f.tipo} onChange={e=>setF({...f,tipo:e.target.value})} options={TIPOS}/>
+        <Checkbox checked={f.esComp} onChange={v=>setF({...f,esComp:v})} label="🏷️ Actividad de la competencia" activeColor="#F97316" activeBg="#FFEDD5" activeBorder="#F97316"/>
+        {f.esComp && <Field label="Marca competencia" type="select" value={f.marcaComp} onChange={e=>setF({...f,marcaComp:e.target.value})} options={COMP}/>}
+        <Field label="Descripción / Notas" type="textarea" value={f.desc} onChange={e=>setF({...f,desc:e.target.value})} rows={2}/>
+        <div onClick={()=>setF({...f,foto:!f.foto})} style={{border:`2px dashed ${f.foto?"#16A34A":"#CBD5E1"}`,borderRadius:"12px",padding:"16px",textAlign:"center",marginBottom:"12px",cursor:"pointer",background:f.foto?"#DCFCE7":"#F8FAFF",transition:"all 0.15s"}}>
+          <span style={{fontSize:"28px"}}>{f.foto?"✅":"📷"}</span>
+          <p style={{fontSize:"12px",fontWeight:"600",margin:"4px 0 0 0",color:f.foto?"#166534":"#94A3B8"}}>{f.foto?"Foto adjuntada":"Toca para marcar foto"}</p>
+        </div>
+        <Btn onClick={save} loading={loading} gradient="linear-gradient(135deg,#F97316,#EA580C)" shadow="0 4px 15px rgba(249,115,22,0.35)">Guardar Actividad → Sheets</Btn>
+      </Card>
+      {data.length > 0 && (
+        <Card>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Últimas {Math.min(data.length,5)}</h3>
+          {data.slice(-5).reverse().map(r => (
+            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+              <div style={{flex:1,marginRight:"8px"}}>
+                <p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:"0 0 2px 0"}}>{r.tipo}</p>
+                <p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{r.merc} · {r.almacen}</p>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}>
+                <Tag color={r.esComp?"orange":"blue"}>{r.esComp?r.marcaComp:"Unimares"}</Tag>
+                {r.foto && <Tag color="green">📷</Tag>}
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
 }
 
-function Precios({data,setData}){
-  const [f,setF]=useState({merc:"",almacen:"",fecha:HOY(),prod:"",pU:"",pC:"",marca:"",oferta:false,obs:""});
-  const save=()=>{if(!f.prod||!f.pU)return alert("Selecciona producto e ingresa precio Unimares.");setData(p=>[...p,{...f,id:Date.now()}]);setF({merc:"",almacen:"",fecha:HOY(),prod:"",pU:"",pC:"",marca:"",oferta:false,obs:""});alert("✅ Precios registrados.");};
-  const diff=f.pU&&f.pC?Number(f.pU)-Number(f.pC):null;
-  return <div>
-    <SectionHead gradient="linear-gradient(135deg,#059669,#047857)" title="💰 Chequeo de Precios" sub="Seguimiento vs. competencia"/>
-    <Card>
-      <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
-      <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
-      <Field label="Producto Unimares *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-        <Field label="Precio Unimares ($) *" type="number" value={f.pU} onChange={e=>setF({...f,pU:e.target.value})}/>
-        <Field label="Precio Competencia ($)" type="number" value={f.pC} onChange={e=>setF({...f,pC:e.target.value})}/>
-      </div>
-      <Field label="Marca competencia" type="select" value={f.marca} onChange={e=>setF({...f,marca:e.target.value})} options={COMP}/>
-      {diff!==null&&<div style={{borderRadius:"12px",padding:"12px",marginBottom:"12px",textAlign:"center",background:diff<0?"#DCFCE7":"#FEE2E2",color:diff<0?"#166534":"#991B1B",fontWeight:"700",fontSize:"13px"}}>
-        {diff<0?"✅ Precio competitivo":"⚠️ Más caro que la competencia"}
-        <span style={{display:"block",fontSize:"11px",fontWeight:"400",marginTop:"2px",opacity:0.8}}>Diferencia: ${Math.abs(diff).toLocaleString()}</span>
-      </div>}
-      <Checkbox checked={f.oferta} onChange={v=>setF({...f,oferta:v})} label="🏷️ Producto en oferta / promoción" activeColor="#059669" activeBg="#DCFCE7" activeBorder="#16A34A"/>
-      <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
-      <Btn onClick={save} gradient="linear-gradient(135deg,#059669,#047857)" shadow="0 4px 15px rgba(5,150,105,0.35)">Registrar Precios</Btn>
-    </Card>
-    {data.length>0&&<Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Últimos chequeos</h3>
-      {data.slice(-5).reverse().map(r=>{const comp=r.pU&&r.pC?Number(r.pU)<Number(r.pC):null;return <div key={r.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}><p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p>{r.oferta&&<Tag color="teal">Oferta</Tag>}</div>
-        <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 4px 0"}}>{r.almacen}</p>
-        <div style={{display:"flex",gap:"12px",marginBottom:"4px"}}><span style={{fontSize:"12px",fontWeight:"700",color:"#1E40AF"}}>U: ${Number(r.pU).toLocaleString()}</span>{r.pC&&<span style={{fontSize:"12px",fontWeight:"700",color:"#EA580C"}}>{r.marca}: ${Number(r.pC).toLocaleString()}</span>}</div>
-        {comp!==null&&<Tag color={comp?"green":"red"}>{comp?"✓ Competitivo":"⚠ Más caro"}</Tag>}
-      </div>;})}
-    </Card>}
-  </div>;
+// ── PRECIOS ────────────────────────────────────────────────────────────────
+function Precios({data, setData}) {
+  const [f, setF] = useState({merc:"",almacen:"",fecha:HOY(),prod:"",pU:"",pC:"",marca:"",oferta:false,obs:""});
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
+
+  const save = async () => {
+    if (!f.prod || !f.pU) return showToast("Selecciona producto e ingresa precio Unimares", false);
+    setLoading(true);
+    const diff = f.pC ? Number(f.pU) - Number(f.pC) : null;
+    const campos = {
+      Fecha: f.fecha, Mercaderista: f.merc, Almacen: f.almacen,
+      Producto: f.prod, PrecioUnimares: f.pU, PrecioCompetencia: f.pC||"—",
+      MarcaCompetencia: f.marca||"—", Diferencia: diff!==null?diff:"—",
+      Resultado: diff!==null?(diff<0?"Competitivo":"Más caro"):"—",
+      EnOferta: f.oferta?"Sí":"No", Observaciones: f.obs, Timestamp: new Date().toISOString()
+    };
+    const ok = await enviarASheets("Precios", campos);
+    setLoading(false);
+    if (ok) {
+      setData(p => [...p, {...f, id:Date.now()}]);
+      setF({merc:"",almacen:"",fecha:HOY(),prod:"",pU:"",pC:"",marca:"",oferta:false,obs:""});
+      showToast("Guardado en Google Sheets ✓", true);
+    } else showToast("Error al guardar. Intenta de nuevo.", false);
+  };
+
+  const diff = f.pU && f.pC ? Number(f.pU) - Number(f.pC) : null;
+
+  return (
+    <div>
+      {toast && <Toast msg={toast.msg} ok={toast.ok}/>}
+      <SectionHead gradient="linear-gradient(135deg,#059669,#047857)" title="💰 Chequeo de Precios" sub="Seguimiento vs. competencia"/>
+      <Card>
+        <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
+        <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
+        <Field label="Producto Unimares *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+          <Field label="Precio Unimares ($) *" type="number" value={f.pU} onChange={e=>setF({...f,pU:e.target.value})}/>
+          <Field label="Precio Competencia ($)" type="number" value={f.pC} onChange={e=>setF({...f,pC:e.target.value})}/>
+        </div>
+        <Field label="Marca competencia" type="select" value={f.marca} onChange={e=>setF({...f,marca:e.target.value})} options={COMP}/>
+        {diff !== null && (
+          <div style={{borderRadius:"12px",padding:"12px",marginBottom:"12px",textAlign:"center",background:diff<0?"#DCFCE7":"#FEE2E2",color:diff<0?"#166534":"#991B1B",fontWeight:"700",fontSize:"13px"}}>
+            {diff<0?"✅ Precio competitivo":"⚠️ Más caro que la competencia"}
+            <span style={{display:"block",fontSize:"11px",fontWeight:"400",marginTop:"2px",opacity:0.8}}>Diferencia: ${Math.abs(diff).toLocaleString()}</span>
+          </div>
+        )}
+        <Checkbox checked={f.oferta} onChange={v=>setF({...f,oferta:v})} label="🏷️ Producto en oferta / promoción" activeColor="#059669" activeBg="#DCFCE7" activeBorder="#16A34A"/>
+        <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
+        <Btn onClick={save} loading={loading} gradient="linear-gradient(135deg,#059669,#047857)" shadow="0 4px 15px rgba(5,150,105,0.35)">Registrar Precios → Sheets</Btn>
+      </Card>
+      {data.length > 0 && (
+        <Card>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Últimos chequeos</h3>
+          {data.slice(-5).reverse().map(r => {
+            const comp = r.pU && r.pC ? Number(r.pU) < Number(r.pC) : null;
+            return (
+              <div key={r.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
+                  <p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p>
+                  {r.oferta && <Tag color="teal">Oferta</Tag>}
+                </div>
+                <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 4px 0"}}>{r.almacen}</p>
+                <div style={{display:"flex",gap:"12px",marginBottom:"4px"}}>
+                  <span style={{fontSize:"12px",fontWeight:"700",color:"#1E40AF"}}>U: ${Number(r.pU).toLocaleString()}</span>
+                  {r.pC && <span style={{fontSize:"12px",fontWeight:"700",color:"#EA580C"}}>{r.marca}: ${Number(r.pC).toLocaleString()}</span>}
+                </div>
+                {comp !== null && <Tag color={comp?"green":"red"}>{comp?"✓ Competitivo":"⚠ Más caro"}</Tag>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+    </div>
+  );
 }
 
-function Inventario({data,setData}){
-  const [f,setF]=useState({merc:"",almacen:"",fecha:HOY(),prod:"",stock:"",stockMin:"",vendidas:"",obs:""});
-  const save=()=>{if(!f.prod||!f.stock)return alert("Selecciona producto e ingresa stock.");setData(p=>[...p,{...f,id:Date.now()}]);setF({merc:"",almacen:"",fecha:HOY(),prod:"",stock:"",stockMin:"",vendidas:"",obs:""});alert("✅ Inventario registrado.");};
-  const alertas=data.filter(r=>r.stockMin&&Number(r.stock)<=Number(r.stockMin));
-  const total=data.reduce((a,r)=>a+Number(r.stock||0),0);
-  return <div>
-    <SectionHead gradient="linear-gradient(135deg,#4F46E5,#3730A3)" title="📦 Inventario Cíclico" sub="Control de stock y alertas"/>
-    {alertas.length>0&&<div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
-      <p style={{color:"#9A3412",fontWeight:"900",fontSize:"13px",margin:"0 0 8px 0"}}>⚠️ {alertas.length} productos con bajo stock</p>
-      {alertas.slice(0,4).map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}>
-        <span style={{fontSize:"12px",color:"#C2410C"}}>{r.prod}</span>
-        <span style={{fontSize:"12px",fontWeight:"900",color:"#991B1B"}}>{r.stock}/{r.stockMin} uds</span>
-      </div>)}
-    </div>}
-    <Card>
-      <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
-      <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
-      <Field label="Producto *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
-        <Field label="Stock actual *" type="number" value={f.stock} onChange={e=>setF({...f,stock:e.target.value})}/>
-        <Field label="Stock mínimo" type="number" value={f.stockMin} onChange={e=>setF({...f,stockMin:e.target.value})}/>
-        <Field label="Vendidas" type="number" value={f.vendidas} onChange={e=>setF({...f,vendidas:e.target.value})}/>
-      </div>
-      <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
-      <Btn onClick={save} gradient="linear-gradient(135deg,#4F46E5,#3730A3)" shadow="0 4px 15px rgba(79,70,229,0.35)">Registrar Inventario</Btn>
-    </Card>
-    {data.length>0&&<Card>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:0}}>Inventarios ({data.length})</h3>
-        <Tag color="blue">Total: {total} uds</Tag>
-      </div>
-      {data.slice(-5).reverse().map(r=>{const bajo=r.stockMin&&Number(r.stock)<=Number(r.stockMin);return <div key={r.id} style={{borderRadius:"12px",padding:"12px",marginBottom:"8px",background:bajo?"#FEF2F2":"#F8FAFF",border:`1px solid ${bajo?"#FECACA":"transparent"}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2px"}}><p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p><Tag color={bajo?"red":"green"}>{r.stock} uds</Tag></div>
-        <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 2px 0"}}>{r.almacen} · {r.merc}</p>
-        {r.vendidas&&<p style={{fontSize:"11px",color:"#94A3B8",margin:0}}>Vendidas: {r.vendidas} uds</p>}
-      </div>;})}
-    </Card>}
-  </div>;
+// ── INVENTARIO ─────────────────────────────────────────────────────────────
+function Inventario({data, setData}) {
+  const [f, setF] = useState({merc:"",almacen:"",fecha:HOY(),prod:"",stock:"",stockMin:"",vendidas:"",obs:""});
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
+
+  const save = async () => {
+    if (!f.prod || !f.stock) return showToast("Selecciona producto e ingresa stock", false);
+    setLoading(true);
+    const bajo = f.stockMin && Number(f.stock) <= Number(f.stockMin);
+    const campos = {
+      Fecha: f.fecha, Mercaderista: f.merc, Almacen: f.almacen,
+      Producto: f.prod, StockActual: f.stock, StockMinimo: f.stockMin||"—",
+      UnidadesVendidas: f.vendidas||"—", AlertaBajoStock: bajo?"⚠️ SÍ":"No",
+      Observaciones: f.obs, Timestamp: new Date().toISOString()
+    };
+    const ok = await enviarASheets("Inventario", campos);
+    setLoading(false);
+    if (ok) {
+      setData(p => [...p, {...f, id:Date.now()}]);
+      setF({merc:"",almacen:"",fecha:HOY(),prod:"",stock:"",stockMin:"",vendidas:"",obs:""});
+      showToast("Guardado en Google Sheets ✓", true);
+    } else showToast("Error al guardar. Intenta de nuevo.", false);
+  };
+
+  const alertas = data.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
+  const total = data.reduce((a,r) => a + Number(r.stock||0), 0);
+
+  return (
+    <div>
+      {toast && <Toast msg={toast.msg} ok={toast.ok}/>}
+      <SectionHead gradient="linear-gradient(135deg,#4F46E5,#3730A3)" title="📦 Inventario Cíclico" sub="Control de stock y alertas"/>
+      {alertas.length > 0 && (
+        <div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
+          <p style={{color:"#9A3412",fontWeight:"900",fontSize:"13px",margin:"0 0 8px 0"}}>⚠️ {alertas.length} productos con bajo stock</p>
+          {alertas.slice(0,4).map(r => (
+            <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}>
+              <span style={{fontSize:"12px",color:"#C2410C"}}>{r.prod}</span>
+              <span style={{fontSize:"12px",fontWeight:"900",color:"#991B1B"}}>{r.stock}/{r.stockMin} uds</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <Card>
+        <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
+        <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
+        <Field label="Producto *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
+          <Field label="Stock actual *" type="number" value={f.stock} onChange={e=>setF({...f,stock:e.target.value})}/>
+          <Field label="Stock mínimo" type="number" value={f.stockMin} onChange={e=>setF({...f,stockMin:e.target.value})}/>
+          <Field label="Vendidas" type="number" value={f.vendidas} onChange={e=>setF({...f,vendidas:e.target.value})}/>
+        </div>
+        <Field label="Observaciones" type="textarea" value={f.obs} onChange={e=>setF({...f,obs:e.target.value})} rows={2}/>
+        <Btn onClick={save} loading={loading} gradient="linear-gradient(135deg,#4F46E5,#3730A3)" shadow="0 4px 15px rgba(79,70,229,0.35)">Registrar Inventario → Sheets</Btn>
+      </Card>
+      {data.length > 0 && (
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+            <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:0}}>Inventarios ({data.length})</h3>
+            <Tag color="blue">Total: {total} uds</Tag>
+          </div>
+          {data.slice(-5).reverse().map(r => {
+            const bajo = r.stockMin && Number(r.stock) <= Number(r.stockMin);
+            return (
+              <div key={r.id} style={{borderRadius:"12px",padding:"12px",marginBottom:"8px",background:bajo?"#FEF2F2":"#F8FAFF",border:`1px solid ${bajo?"#FECACA":"transparent"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:"2px"}}>
+                  <p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p>
+                  <Tag color={bajo?"red":"green"}>{r.stock} uds</Tag>
+                </div>
+                <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 2px 0"}}>{r.almacen} · {r.merc}</p>
+                {r.vendidas && <p style={{fontSize:"11px",color:"#94A3B8",margin:0}}>Vendidas: {r.vendidas} uds</p>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+    </div>
+  );
 }
 
-function Averias({data,setData}){
-  const CATS=["Lata abollada","Fecha vencida","Empaque roto","Producto húmedo","Otro"];
-  const ACCS=["Retirado de góndola","Reportado a supervisión","Devuelto a bodega","Descarte total","Pendiente decisión"];
-  const [f,setF]=useState({merc:"",almacen:"",fecha:HOY(),hora:HORA(),prod:"",cat:"",cant:"",valor:"",desc:"",accion:""});
-  const save=()=>{if(!f.prod||!f.cat)return alert("Selecciona producto y categoría de avería.");setData(p=>[...p,{...f,id:Date.now()}]);setF({merc:"",almacen:"",fecha:HOY(),hora:HORA(),prod:"",cat:"",cant:"",valor:"",desc:"",accion:""});alert("✅ Avería registrada.");};
-  const totCant=data.reduce((a,r)=>a+Number(r.cant||0),0);
-  const totVal=data.reduce((a,r)=>a+Number(r.valor||0),0);
-  return <div>
-    <SectionHead gradient="linear-gradient(135deg,#DC2626,#991B1B)" title="⚠️ Averías" sub="Control de producto dañado o vencido"/>
-    {data.length>0&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-      <div style={{background:"#FEF2F2",border:"2px solid #FECACA",borderRadius:"16px",padding:"12px",textAlign:"center"}}>
-        <p style={{fontSize:"32px",fontWeight:"900",color:"#DC2626",margin:"0 0 4px 0"}}>{totCant}</p>
-        <p style={{fontSize:"11px",color:"#EF4444",fontWeight:"600",margin:0}}>Unidades averiadas</p>
-      </div>
-      <div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"12px",textAlign:"center"}}>
-        <p style={{fontSize:"22px",fontWeight:"900",color:"#EA580C",margin:"0 0 4px 0"}}>${totVal.toLocaleString()}</p>
-        <p style={{fontSize:"11px",color:"#F97316",fontWeight:"600",margin:0}}>Pérdida estimada</p>
-      </div>
-    </div>}
-    <Card>
-      <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
-      <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
-      <Field label="Producto *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
-      <Field label="Categoría de avería *" type="select" value={f.cat} onChange={e=>setF({...f,cat:e.target.value})} options={CATS}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-        <Field label="Cantidad (uds)" type="number" value={f.cant} onChange={e=>setF({...f,cant:e.target.value})}/>
-        <Field label="Valor estimado ($)" type="number" value={f.valor} onChange={e=>setF({...f,valor:e.target.value})}/>
-      </div>
-      <Field label="Descripción del daño" type="textarea" value={f.desc} onChange={e=>setF({...f,desc:e.target.value})} rows={2}/>
-      <Field label="Acción tomada" type="select" value={f.accion} onChange={e=>setF({...f,accion:e.target.value})} options={ACCS}/>
-      <Btn onClick={save} gradient="linear-gradient(135deg,#DC2626,#991B1B)" shadow="0 4px 15px rgba(220,38,38,0.35)">Registrar Avería</Btn>
-    </Card>
-    {data.length>0&&<Card>
-      <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Averías registradas ({data.length})</h3>
-      {data.slice(-5).reverse().map(r=><div key={r.id} style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:"12px",padding:"12px",marginBottom:"8px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}><p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p><Tag color="red">{r.cant||0} uds</Tag></div>
-        <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 2px 0"}}>{r.cat} · {r.almacen}</p>
-        {r.accion&&<p style={{fontSize:"11px",color:"#94A3B8",margin:0}}>{r.accion}</p>}
-      </div>)}
-    </Card>}
-  </div>;
+// ── AVERÍAS ────────────────────────────────────────────────────────────────
+function Averias({data, setData}) {
+  const CATS = ["Lata abollada","Fecha vencida","Empaque roto","Producto húmedo","Otro"];
+  const ACCS = ["Retirado de góndola","Reportado a supervisión","Devuelto a bodega","Descarte total","Pendiente decisión"];
+  const [f, setF] = useState({merc:"",almacen:"",fecha:HOY(),hora:HORA(),prod:"",cat:"",cant:"",valor:"",desc:"",accion:""});
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
+
+  const save = async () => {
+    if (!f.prod || !f.cat) return showToast("Selecciona producto y categoría", false);
+    setLoading(true);
+    const campos = {
+      Fecha: f.fecha, Hora: f.hora, Mercaderista: f.merc, Almacen: f.almacen,
+      Producto: f.prod, Categoria: f.cat, Cantidad: f.cant||0,
+      ValorEstimado: f.valor||0, Descripcion: f.desc, AccionTomada: f.accion||"—",
+      Timestamp: new Date().toISOString()
+    };
+    const ok = await enviarASheets("Averias", campos);
+    setLoading(false);
+    if (ok) {
+      setData(p => [...p, {...f, id:Date.now()}]);
+      setF({merc:"",almacen:"",fecha:HOY(),hora:HORA(),prod:"",cat:"",cant:"",valor:"",desc:"",accion:""});
+      showToast("Guardado en Google Sheets ✓", true);
+    } else showToast("Error al guardar. Intenta de nuevo.", false);
+  };
+
+  const totCant = data.reduce((a,r) => a + Number(r.cant||0), 0);
+  const totVal = data.reduce((a,r) => a + Number(r.valor||0), 0);
+
+  return (
+    <div>
+      {toast && <Toast msg={toast.msg} ok={toast.ok}/>}
+      <SectionHead gradient="linear-gradient(135deg,#DC2626,#991B1B)" title="⚠️ Averías" sub="Control de producto dañado o vencido"/>
+      {data.length > 0 && (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+          <div style={{background:"#FEF2F2",border:"2px solid #FECACA",borderRadius:"16px",padding:"12px",textAlign:"center"}}>
+            <p style={{fontSize:"32px",fontWeight:"900",color:"#DC2626",margin:"0 0 4px 0"}}>{totCant}</p>
+            <p style={{fontSize:"11px",color:"#EF4444",fontWeight:"600",margin:0}}>Unidades averiadas</p>
+          </div>
+          <div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"12px",textAlign:"center"}}>
+            <p style={{fontSize:"22px",fontWeight:"900",color:"#EA580C",margin:"0 0 4px 0"}}>${totVal.toLocaleString()}</p>
+            <p style={{fontSize:"11px",color:"#F97316",fontWeight:"600",margin:0}}>Pérdida estimada</p>
+          </div>
+        </div>
+      )}
+      <Card>
+        <Field label="Mercaderista" type="select" value={f.merc} onChange={e=>setF({...f,merc:e.target.value})} options={MERCS.map(m=>m.nombre)}/>
+        <Field label="Almacén" type="select" value={f.almacen} onChange={e=>setF({...f,almacen:e.target.value})} options={ALMACENES}/>
+        <Field label="Producto *" type="select" value={f.prod} onChange={e=>setF({...f,prod:e.target.value})} options={PRODS}/>
+        <Field label="Categoría de avería *" type="select" value={f.cat} onChange={e=>setF({...f,cat:e.target.value})} options={CATS}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+          <Field label="Cantidad (uds)" type="number" value={f.cant} onChange={e=>setF({...f,cant:e.target.value})}/>
+          <Field label="Valor estimado ($)" type="number" value={f.valor} onChange={e=>setF({...f,valor:e.target.value})}/>
+        </div>
+        <Field label="Descripción del daño" type="textarea" value={f.desc} onChange={e=>setF({...f,desc:e.target.value})} rows={2}/>
+        <Field label="Acción tomada" type="select" value={f.accion} onChange={e=>setF({...f,accion:e.target.value})} options={ACCS}/>
+        <Btn onClick={save} loading={loading} gradient="linear-gradient(135deg,#DC2626,#991B1B)" shadow="0 4px 15px rgba(220,38,38,0.35)">Registrar Avería → Sheets</Btn>
+      </Card>
+      {data.length > 0 && (
+        <Card>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>Averías registradas ({data.length})</h3>
+          {data.slice(-5).reverse().map(r => (
+            <div key={r.id} style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:"12px",padding:"12px",marginBottom:"8px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
+                <p style={{fontWeight:"700",fontSize:"13px",color:"#1a2240",margin:0}}>{r.prod}</p>
+                <Tag color="red">{r.cant||0} uds</Tag>
+              </div>
+              <p style={{fontSize:"11px",color:"#6B7B9E",margin:"0 0 2px 0"}}>{r.cat} · {r.almacen}</p>
+              {r.accion && <p style={{fontSize:"11px",color:"#94A3B8",margin:0}}>{r.accion}</p>}
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
 }
 
-const TABS=[{id:"dash",i:"📊",l:"Inicio"},{id:"asist",i:"🕐",l:"Asistencia"},{id:"activ",i:"📸",l:"Actividades"},{id:"prec",i:"💰",l:"Precios"},{id:"inv",i:"📦",l:"Inventario"},{id:"aver",i:"⚠️",l:"Averías"}];
+// ── APP PRINCIPAL ──────────────────────────────────────────────────────────
+const TABS = [
+  {id:"dash",i:"📊",l:"Inicio"},
+  {id:"asist",i:"🕐",l:"Asistencia"},
+  {id:"activ",i:"📸",l:"Actividades"},
+  {id:"prec",i:"💰",l:"Precios"},
+  {id:"inv",i:"📦",l:"Inventario"},
+  {id:"aver",i:"⚠️",l:"Averías"}
+];
 
-function App(){
-  const [tab,setTab]=useState("dash");
-  const [as,setAs]=useState([]);
-  const [ac,setAc]=useState([]);
-  const [pr,setPr]=useState([]);
-  const [inv,setInv]=useState([]);
-  const [av,setAv]=useState([]);
+function App() {
+  const [tab, setTab] = useState("dash");
+  const [as, setAs] = useState([]);
+  const [ac, setAc] = useState([]);
+  const [pr, setPr] = useState([]);
+  const [inv, setInv] = useState([]);
+  const [av, setAv] = useState([]);
+
   return (
     <div style={{minHeight:"100vh",background:"#F0F4FF",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       <div style={{maxWidth:"420px",margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
         <div style={{flex:1,overflowY:"auto",padding:"16px 12px 100px"}}>
-          {tab==="dash"&&<Dashboard as={as} ac={ac} pr={pr} inv={inv} av={av}/>}
-          {tab==="asist"&&<Asistencia data={as} setData={setAs}/>}
-          {tab==="activ"&&<Actividades data={ac} setData={setAc}/>}
-          {tab==="prec"&&<Precios data={pr} setData={setPr}/>}
-          {tab==="inv"&&<Inventario data={inv} setData={setInv}/>}
-          {tab==="aver"&&<Averias data={av} setData={setAv}/>}
+          {tab==="dash"   && <Dashboard as={as} ac={ac} pr={pr} inv={inv} av={av}/>}
+          {tab==="asist"  && <Asistencia data={as} setData={setAs}/>}
+          {tab==="activ"  && <Actividades data={ac} setData={setAc}/>}
+          {tab==="prec"   && <Precios data={pr} setData={setPr}/>}
+          {tab==="inv"    && <Inventario data={inv} setData={setInv}/>}
+          {tab==="aver"   && <Averias data={av} setData={setAv}/>}
         </div>
         <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(12px)",borderTop:"1px solid #E8EDF8",padding:"8px 4px",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)"}}>
           <div style={{display:"flex",justifyContent:"space-around",maxWidth:"420px",margin:"0 auto"}}>
-            {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",padding:"6px 8px",borderRadius:"12px",border:"none",cursor:"pointer",background:tab===t.id?"#EEF2FF":"transparent",transition:"all 0.15s",fontFamily:"inherit"}}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",padding:"6px 8px",borderRadius:"12px",border:"none",cursor:"pointer",background:tab===t.id?"#EEF2FF":"transparent",transition:"all 0.15s",fontFamily:"inherit"}}>
                 <span style={{fontSize:"20px",lineHeight:1}}>{t.i}</span>
                 <span style={{fontSize:"10px",fontWeight:"700",color:tab===t.id?"#3B6FE8":"#94A3B8"}}>{t.l}</span>
               </button>
