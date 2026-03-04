@@ -21,9 +21,9 @@ const { useState, useCallback } = React;
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyGJY-8PhZFBRtEIdtbu4f7e9lxCVTSn0D1MZ-HkYr7IGRzrV1cgz3DxYwlMWZr5a5jag/exec";
 
-const ALMACENES = ["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","D1 - Multicentro","Ara - Sur","Olímpica Ibagué"];
-const MERCS = [{id:1,nombre:"Laura Gómez",almacen:"Éxito Ibagué Centro"},{id:2,nombre:"Carlos Ríos",almacen:"Jumbo Ibagué"},{id:3,nombre:"María Suárez",almacen:"Carulla La Estación"},{id:4,nombre:"Andrés Mora",almacen:"Mercacentro No. 10"}];
-const PRODS = ["Atún en Lata 170g","Sardinas en Tomate 425g","Filete de Tilapia 500g","Camarones Pelados 400g","Calamar en Anillos 250g","Mariscos Mixtos 300g","Mejillones 200g","Bacalao Salado 500g"];
+const ALMACENES = ["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","Olímpica Ibagué","Populares","Surtiplaza La 37","Surtiplaza Acqua","Surtiplaza El Salado"];
+const MERCS = [{id:1,nombre:"Ruby Gracia",almacen:"Todos",rol:"Mercaderista"},{id:2,nombre:"Mercadeo 1",almacen:"",rol:"Mercaderista"},{id:3,nombre:"Mercadeo 2",almacen:"",rol:"Mercaderista"},{id:4,nombre:"Supervisor / Jefe",almacen:"Todos",rol:"Supervisor"}];
+const PRODS = ["Camarón Jumbo x 350g (Cód.24)","Camarón Hogar x 350g (Cód.22)","Filete de Salmón Porción x 350g (Cód.8)","Mixtura Mariscos x 500g (Cód.11)","Filete de Tilapia x 500g (Cód.21)","Filete de Tilapia x 1000g (Cód.30)","Bagre Amazonas x 450g (Cód.28)","Pescado Seco (Cód.188)"];
 const COMP = ["Van Camps","Isabel","Corona","Calypso","Rica"];
 const HOY = () => new Date().toISOString().split("T")[0];
 const HORA = () => new Date().toTimeString().slice(0,5);
