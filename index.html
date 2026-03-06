@@ -603,7 +603,7 @@ function ChequeoMasivo({data, setData}) {
   const initPrecios = () => {
     const obj = {};
     PRODS.forEach(p => {
-      obj[p] = {};
+      obj[p] = { _unimares: String(PRECIOS_UNIMARES[p]) };
       COMP.forEach(c => { obj[p][c] = ""; });
     });
     return obj;
@@ -613,24 +613,32 @@ function ChequeoMasivo({data, setData}) {
   const [almacen, setAlmacen] = useState("");
   const [fecha, setFecha] = useState(HOY());
   const [precios, setPrecios] = useState(initPrecios());
+  const [abiertos, setAbiertos] = useState({});
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, ok) => { setToast({msg,ok}); setTimeout(()=>setToast(null), 3500); };
 
+  const toggleProd = (prod) => setAbiertos(prev => ({...prev, [prod]: !prev[prod]}));
+
   const setVal = (prod, marca, val) => {
     setPrecios(prev => ({...prev, [prod]: {...prev[prod], [marca]: val}}));
   };
+
+  const pct = (pU, pC) => {
+    if (!pC || !pU || isNaN(pC) || isNaN(pU)) return null;
+    return Math.round(((Number(pC) - Number(pU)) / Number(pU)) * 100);
+  };
+
+  const prodLleno = (prod) => COMP.some(c => precios[prod][c] !== "");
 
   const save = async () => {
     if (!merc || !almacen) return showToast("Selecciona mercaderista y almacén", false);
     setLoading(true);
     let enviados = 0;
     for (const prod of PRODS) {
-      const pU = PRECIOS_UNIMARES[prod];
-      const filaComp = COMP.map(c => precios[prod][c] || "—");
-      const tieneAlgo = COMP.some(c => precios[prod][c] !== "");
-      if (!tieneAlgo) continue;
+      if (!prodLleno(prod)) continue;
+      const pU = precios[prod]["_unimares"] || PRECIOS_UNIMARES[prod];
       const campos = {
         Fecha: fecha, Mercaderista: merc, Almacen: almacen, Producto: prod,
         PrecioUnimares: pU,
@@ -649,17 +657,15 @@ function ChequeoMasivo({data, setData}) {
     if (enviados > 0) {
       setData(prev => [...prev, {merc, almacen, fecha, precios, id: Date.now()}]);
       setPrecios(initPrecios());
+      setAbiertos({});
       setMerc(""); setAlmacen("");
       showToast(`✓ ${enviados} productos enviados a Sheets`, true);
     } else {
-      showToast("Ingresa al menos un precio de competencia", false);
+      showToast("Abre al menos un producto y llena precios", false);
     }
   };
 
-  const pct = (pU, pC) => {
-    if (!pC || !pU) return null;
-    return Math.round(((Number(pC) - pU) / pU) * 100);
-  };
+  const totalLlenos = PRODS.filter(p => prodLleno(p)).length;
 
   return (
     <div>
@@ -667,7 +673,7 @@ function ChequeoMasivo({data, setData}) {
       <div style={{background:"linear-gradient(135deg,#7C3AED,#5B21B6)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:"-30px",right:"-30px",width:"120px",height:"120px",background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
         <h2 style={{color:"white",fontWeight:"900",fontSize:"22px",margin:"0 0 4px 0",position:"relative",zIndex:1}}>📊 Chequeo Masivo</h2>
-        <p style={{color:"rgba(255,255,255,0.7)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Todos los productos vs toda la competencia</p>
+        <p style={{color:"rgba(255,255,255,0.7)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Toca cada producto para abrir y llenar precios</p>
       </div>
 
       {/* Cabecera */}
@@ -677,57 +683,109 @@ function ChequeoMasivo({data, setData}) {
           <Field label="Almacén *" type="select" value={almacen} onChange={e=>setAlmacen(e.target.value)} options={ALMACENES}/>
         </div>
         <Field label="Fecha" type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
+        {totalLlenos > 0 && (
+          <div style={{background:"#EEF2FF",borderRadius:"10px",padding:"8px 12px",textAlign:"center"}}>
+            <span style={{fontSize:"12px",fontWeight:"700",color:"#4F46E5"}}>✓ {totalLlenos} de {PRODS.length} productos con datos</span>
+          </div>
+        )}
       </Card>
 
-      {/* Tabla de precios */}
-      <div style={{marginBottom:"12px"}}>
+      {/* Acordeón de productos */}
+      <div style={{marginBottom:"80px"}}>
         {PRODS.map(prod => {
-          const pU = PRECIOS_UNIMARES[prod];
+          const abierto = !!abiertos[prod];
+          const lleno = prodLleno(prod);
+          const pU = precios[prod]["_unimares"];
+          const cambiado = pU !== String(PRECIOS_UNIMARES[prod]);
+
           return (
-            <div key={prod} style={{background:"white",borderRadius:"16px",padding:"14px",marginBottom:"10px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
-              {/* Producto header */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px",paddingBottom:"8px",borderBottom:"2px solid #EEF2FF"}}>
-                <p style={{fontWeight:"900",fontSize:"13px",color:"#0F2167",margin:0,flex:1,lineHeight:"1.3"}}>{prod}</p>
-                <div style={{background:"linear-gradient(135deg,#3B6FE8,#2952C0)",borderRadius:"8px",padding:"4px 10px",marginLeft:"8px",flexShrink:0}}>
-                  <span style={{color:"white",fontSize:"12px",fontWeight:"900"}}>${pU.toLocaleString()}</span>
+            <div key={prod} style={{background:"white",borderRadius:"16px",marginBottom:"8px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:`2px solid ${lleno?"#C4B5FD":abierto?"#E8EDF8":"#E8EDF8"}`,overflow:"hidden",transition:"all 0.2s"}}>
+
+              {/* Header — siempre visible */}
+              <div onClick={()=>toggleProd(prod)}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px",cursor:"pointer",background:abierto?"#FAFAFA":"white"}}>
+                <div style={{flex:1}}>
+                  <p style={{fontWeight:"800",fontSize:"13px",color:"#0F2167",margin:"0 0 2px 0",lineHeight:"1.3"}}>{prod}</p>
+                  <div style={{display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:"11px",fontWeight:"700",color: cambiado?"#D97706":"#3B6FE8",background: cambiado?"#FEF3C7":"#EEF2FF",padding:"2px 7px",borderRadius:"6px"}}>
+                      Unimares: ${Number(pU).toLocaleString()} {cambiado?"✏️":""}
+                    </span>
+                    {lleno && <span style={{fontSize:"11px",fontWeight:"700",color:"#7C3AED",background:"#EDE9FE",padding:"2px 7px",borderRadius:"6px"}}>✓ con datos</span>}
+                  </div>
                 </div>
+                <span style={{fontSize:"20px",color:"#94A3B8",marginLeft:"8px",transition:"transform 0.2s",transform:abierto?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
               </div>
-              {/* Competencia inputs */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
-                {COMP.map(marca => {
-                  const val = precios[prod][marca];
-                  const p = pct(pU, val);
-                  const masBarato = p !== null && p < 0;
-                  const masCaro = p !== null && p > 0;
-                  return (
-                    <div key={marca} style={{background: masBarato?"#FEF2F2": masCaro?"#F0FDF4":"#F8FAFF", borderRadius:"10px", padding:"8px", border:`1px solid ${masBarato?"#FECACA":masCaro?"#BBF7D0":"#E8EDF8"}`}}>
-                      <label style={{fontSize:"10px",fontWeight:"700",color: masBarato?"#DC2626":masCaro?"#16A34A":"#6B7B9E",display:"block",marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.05em"}}>{marca}</label>
+
+              {/* Contenido desplegable */}
+              {abierto && (
+                <div style={{padding:"0 14px 14px",borderTop:"1px solid #F0F4FF"}}>
+
+                  {/* Precio Unimares editable */}
+                  <div style={{background:"linear-gradient(135deg,#EEF2FF,#E0E7FF)",borderRadius:"12px",padding:"10px 14px",marginBottom:"12px",marginTop:"12px",border:"2px solid #C7D2FE"}}>
+                    <label style={{fontSize:"10px",fontWeight:"800",color:"#3730A3",display:"block",marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.06em"}}>🐟 Unimares (editable)</label>
+                    <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                      <span style={{fontSize:"14px",color:"#4F46E5",fontWeight:"700"}}>$</span>
                       <input
                         type="number"
-                        placeholder="precio $"
-                        value={val}
-                        onChange={e => setVal(prod, marca, e.target.value)}
-                        style={{width:"100%",border:"none",background:"transparent",fontSize:"14px",fontWeight:"700",color:"#1a2240",outline:"none",fontFamily:"inherit"}}
+                        value={pU}
+                        onChange={e => setVal(prod, "_unimares", e.target.value)}
+                        style={{flex:1,border:"none",background:"transparent",fontSize:"18px",fontWeight:"900",color:"#1E1B4B",outline:"none",fontFamily:"inherit"}}
                       />
-                      {p !== null && (
-                        <div style={{fontSize:"10px",fontWeight:"700",marginTop:"2px",color: masBarato?"#DC2626":"#16A34A"}}>
-                          {masBarato ? `▲ Ellos ${Math.abs(p)}% más barato` : `▼ Ellos ${p}% más caro`}
-                        </div>
+                      {cambiado && (
+                        <button onClick={()=>setVal(prod,"_unimares",String(PRECIOS_UNIMARES[prod]))}
+                          style={{fontSize:"10px",background:"#E0E7FF",border:"none",borderRadius:"6px",padding:"3px 7px",cursor:"pointer",color:"#4338CA",fontWeight:"700"}}>
+                          Restablecer
+                        </button>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+
+                  {/* Competidores */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+                    {COMP.map(marca => {
+                      const val = precios[prod][marca];
+                      const p = pct(pU, val);
+                      const masBarato = p !== null && p < 0;
+                      const masCaro = p !== null && p > 0;
+                      const igual = p === 0;
+                      return (
+                        <div key={marca} style={{
+                          background: masBarato?"#FEF2F2": masCaro?"#F0FDF4": igual?"#FFF7ED":"#F8FAFF",
+                          borderRadius:"10px", padding:"10px",
+                          border:`1px solid ${masBarato?"#FECACA":masCaro?"#BBF7D0":igual?"#FED7AA":"#E8EDF8"}`
+                        }}>
+                          <label style={{fontSize:"10px",fontWeight:"800",color: masBarato?"#DC2626":masCaro?"#16A34A":"#6B7B9E",display:"block",marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.04em"}}>{marca}</label>
+                          <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+                            <span style={{fontSize:"13px",color:"#94A3B8",fontWeight:"600"}}>$</span>
+                            <input
+                              type="number"
+                              placeholder="—"
+                              value={val}
+                              onChange={e => setVal(prod, marca, e.target.value)}
+                              style={{flex:1,border:"none",background:"transparent",fontSize:"15px",fontWeight:"800",color:"#1a2240",outline:"none",fontFamily:"inherit",width:"100%"}}
+                            />
+                          </div>
+                          {p !== null && (
+                            <div style={{fontSize:"10px",fontWeight:"800",marginTop:"3px",color: masBarato?"#DC2626":masCaro?"#16A34A":"#D97706"}}>
+                              {masBarato ? `▼ ${Math.abs(p)}% más barato` : masCaro ? `▲ ${p}% más caro` : `= Mismo precio`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      <div style={{position:"sticky",bottom:"80px",zIndex:50,marginBottom:"8px"}}>
+      <div style={{position:"sticky",bottom:"80px",zIndex:50,marginBottom:"12px"}}>
         <Btn onClick={save} loading={loading}
           gradient="linear-gradient(135deg,#7C3AED,#5B21B6)"
           shadow="0 4px 20px rgba(124,58,237,0.4)">
-          Enviar Chequeo Completo → Sheets
+          {totalLlenos > 0 ? `Enviar ${totalLlenos} productos → Sheets` : "Enviar Chequeo → Sheets"}
         </Btn>
       </div>
 
