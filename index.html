@@ -227,28 +227,85 @@ function StatCard({icon, value, label, gradient}) {
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
+function BarChart({data, color}) {
+  const max = Math.max(...data.map(d=>d.v), 1);
+  return (
+    <div style={{display:"flex",alignItems:"flex-end",gap:"6px",height:"70px",padding:"0 4px"}}>
+      {data.map((d,i) => (
+        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}}>
+          <span style={{fontSize:"10px",fontWeight:"900",color:"#0F2167"}}>{d.v||""}</span>
+          <div style={{width:"100%",background:d.v>0?color:"#E8EDF8",borderRadius:"6px 6px 0 0",height: d.v>0 ? Math.max((d.v/max)*50,6)+"px":"6px",transition:"height 0.4s ease",minHeight:"6px"}}/>
+          <span style={{fontSize:"9px",color:"#94A3B8",fontWeight:"600",textAlign:"center",lineHeight:"1.1"}}>{d.l}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniDonut({pct, color, label, value}) {
+  const r = 28, stroke = 7;
+  const circ = 2*Math.PI*r;
+  const offset = circ - (pct/100)*circ;
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"4px"}}>
+      <svg width="70" height="70" viewBox="0 0 70 70">
+        <circle cx="35" cy="35" r={r} fill="none" stroke="#E8EDF8" strokeWidth={stroke}/>
+        <circle cx="35" cy="35" r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset}
+          strokeLinecap="round" transform="rotate(-90 35 35)"
+          style={{transition:"stroke-dashoffset 0.6s ease"}}/>
+        <text x="35" y="39" textAnchor="middle" fontSize="14" fontWeight="900" fill="#0F2167">{value}</text>
+      </svg>
+      <span style={{fontSize:"10px",color:"#6B7B9E",fontWeight:"700",textAlign:"center"}}>{label}</span>
+    </div>
+  );
+}
+
 function Dashboard({as, ac, pr, inv, av, limpiar}) {
   const h = HOY();
   const alertas = inv.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
+
+  // Datos gráfica actividades por día (últimos 7 días)
+  const ultimos7 = Array.from({length:7}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate()-6+i);
+    const key = d.toISOString().split("T")[0];
+    const dias = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
+    return { l: dias[d.getDay()], v: ac.filter(r=>r.fecha===key).length, key };
+  });
+
+  // Datos gráfica productos en chequeo
+  const prodChequeo = PRODS.slice(0,6).map(p => ({
+    l: p.split(" ")[0],
+    v: pr.filter(r=>r.prod===p).length
+  }));
+
+  // Métricas hoy
+  const presHoy = as.filter(r=>r.fecha===h).length;
+  const actHoy  = ac.filter(r=>r.fecha===h).length;
+  const invHoy  = inv.filter(r=>r.fecha===h).length;
+  const precHoy = pr.filter(r=>r.fecha===h).length;
+  const totalMercs = MERCS.filter(m=>m.rol==="Mercaderista").length;
+  const pctPres = totalMercs > 0 ? Math.round((presHoy/totalMercs)*100) : 0;
+  const pctAct  = Math.min(Math.round((actHoy/Math.max(presHoy*3,1))*100),100);
+
   return (
     <div>
+      {/* Hero */}
       <div style={{background:"linear-gradient(135deg,#0F2167,#1a3a8f,#0f4c8f)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:"-32px",right:"-32px",width:"128px",height:"128px",background:"rgba(255,255,255,0.06)",borderRadius:"50%"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative",zIndex:1}}>
           <div>
-            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-              <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo10.png" alt="Unimares" style={{height:"44px",objectFit:"contain",maxWidth:"180px"}}/>
-            </div>
+            <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo10.png" alt="Unimares" style={{height:"44px",objectFit:"contain",maxWidth:"180px",marginBottom:"4px"}}/>
             <p style={{color:"#93C5FD",fontSize:"12px",margin:"0 0 2px 0",fontWeight:"500"}}>Gestión Mercaderistas · Ibagué</p>
             <p style={{color:"#60A5FA",fontSize:"11px",margin:0}}>{new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"})}</p>
           </div>
           <div style={{background:"rgba(255,255,255,0.12)",borderRadius:"14px",padding:"10px 16px",textAlign:"center"}}>
-            <div style={{color:"white",fontWeight:"900",fontSize:"28px",lineHeight:1}}>{as.filter(r=>r.fecha===h).length}</div>
+            <div style={{color:"white",fontWeight:"900",fontSize:"28px",lineHeight:1}}>{presHoy}</div>
             <div style={{color:"#93C5FD",fontSize:"10px",fontWeight:"600",marginTop:"2px"}}>presentes</div>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginTop:"16px",position:"relative",zIndex:1}}>
-          {[["📸",ac.filter(r=>r.fecha===h).length,"Actividades"],["💰",pr.filter(r=>r.fecha===h).length,"Precios"],["⚠️",av.filter(r=>r.fecha===h).length,"Averías"]].map(([i,v,l])=>
+          {[["📸",actHoy,"Actividades"],["🏷️",precHoy,"Precios"],["⚠️",av.filter(r=>r.fecha===h).length,"Averías"]].map(([i,v,l])=>
             <div key={l} style={{background:"rgba(255,255,255,0.12)",borderRadius:"12px",padding:"10px",textAlign:"center"}}>
               <div style={{fontSize:"20px"}}>{i}</div>
               <div style={{color:"white",fontWeight:"900",fontSize:"22px",lineHeight:1}}>{v}</div>
@@ -258,41 +315,60 @@ function Dashboard({as, ac, pr, inv, av, limpiar}) {
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-        <StatCard icon="🕐" value={as.filter(r=>r.fecha===h).length} label="Asistencias hoy" gradient="linear-gradient(135deg,#3B6FE8,#2952C0)"/>
-        <StatCard icon="📦" value={inv.filter(r=>r.fecha===h).length} label="Inventarios hoy" gradient="linear-gradient(135deg,#6366F1,#4F46E5)"/>
-        <StatCard icon="🔔" value={alertas.length} label="Alertas stock bajo" gradient={alertas.length>0?"linear-gradient(135deg,#EF4444,#DC2626)":"linear-gradient(135deg,#0D9488,#0F766E)"}/>
-        <StatCard icon="📊" value={ac.length} label="Total actividades" gradient="linear-gradient(135deg,#F97316,#EA580C)"/>
-      </div>
-
-      <div style={{background:"#E0F2FE",border:"1px solid #BAE6FD",borderRadius:"16px",padding:"12px 16px",marginBottom:"12px",display:"flex",alignItems:"center",gap:"10px"}}>
-        <span style={{fontSize:"20px"}}>📊</span>
-        <div>
-          <p style={{margin:0,fontSize:"12px",fontWeight:"700",color:"#0369A1"}}>Datos guardados en Google Sheets</p>
-          <p style={{margin:0,fontSize:"11px",color:"#0284C7"}}>Cada registro se envía automáticamente a tu hoja de cálculo</p>
+      {/* Donuts — métricas clave */}
+      <div style={{background:"white",borderRadius:"20px",padding:"16px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 14px 0"}}>📊 Rendimiento Hoy</h3>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"8px"}}>
+          <MiniDonut pct={pctPres} color="#3B6FE8" label="Asistencia" value={presHoy+"/"+totalMercs}/>
+          <MiniDonut pct={pctAct}  color="#F97316" label="Actividades" value={actHoy}/>
+          <MiniDonut pct={Math.min(invHoy*20,100)} color="#6366F1" label="Inventarios" value={invHoy}/>
+          <MiniDonut pct={Math.min(precHoy*10,100)} color="#0D9488" label="Chequeos" value={precHoy}/>
         </div>
       </div>
 
-      <Card>
-        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo hoy</h3>
+      {/* Gráfica actividades 7 días */}
+      <div style={{background:"white",borderRadius:"20px",padding:"16px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 14px 0"}}>📈 Actividades — Últimos 7 días</h3>
+        <BarChart data={ultimos7} color="#3B6FE8"/>
+      </div>
+
+      {/* Gráfica chequeo por producto */}
+      {pr.length > 0 && (
+        <div style={{background:"white",borderRadius:"20px",padding:"16px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 14px 0"}}>🏷️ Chequeos por Producto</h3>
+          <BarChart data={prodChequeo} color="#0D9488"/>
+        </div>
+      )}
+
+      {/* Equipo hoy */}
+      <div style={{background:"white",borderRadius:"20px",padding:"16px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo Hoy</h3>
         {MERCS.map(m => {
           const a = as.find(r => r.merc===m.nombre && r.fecha===h);
           const nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
+          const nI = inv.filter(r => r.merc===m.nombre && r.fecha===h).length;
+          const nP = pr.filter(r => r.merc===m.nombre && r.fecha===h).length;
           return (
-            <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
-              <div>
-                <p style={{fontWeight:"700",fontSize:"14px",color:"#1a2240",margin:"0 0 2px 0"}}>{m.nombre}</p>
-                <p style={{fontSize:"11px",color:"#6B7B9E",margin:0}}>{m.almacen}</p>
+            <div key={m.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <p style={{fontWeight:"800",fontSize:"13px",color:"#1a2240",margin:0}}>{m.nombre}</p>
+                <Tag color={a?"green":"red"}>{a?"✓ Presente":"Ausente"}</Tag>
               </div>
-              <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
-                <Tag color="blue">{nA} act.</Tag>
-                <Tag color={a?"green":"red"}>{a?"✓ Pres.":"Ausente"}</Tag>
+              {/* Mini barra de actividad */}
+              <div style={{display:"flex",gap:"6px"}}>
+                {[["📸",nA,"act"],["🏷️",nP,"prec"],["📦",nI,"inv"]].map(([ic,val,lb])=>(
+                  <div key={lb} style={{background:val>0?"#EEF2FF":"#F8FAFF",borderRadius:"8px",padding:"3px 8px",display:"flex",gap:"4px",alignItems:"center"}}>
+                    <span style={{fontSize:"11px"}}>{ic}</span>
+                    <span style={{fontSize:"11px",fontWeight:"800",color:val>0?"#3B6FE8":"#CBD5E1"}}>{val}</span>
+                  </div>
+                ))}
               </div>
             </div>
           );
         })}
-      </Card>
+      </div>
 
+      {/* Alertas stock */}
       {alertas.length > 0 && (
         <div style={{background:"#FFF7ED",border:"2px solid #FED7AA",borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
           <p style={{color:"#9A3412",fontWeight:"900",fontSize:"13px",margin:"0 0 10px 0"}}>🔔 Alertas de Stock Bajo</p>
@@ -305,15 +381,27 @@ function Dashboard({as, ac, pr, inv, av, limpiar}) {
         </div>
       )}
 
-      <Card>
-        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>📈 Acumulado Total</h3>
-        {[["Asistencias totales",as.length],["Actividades totales",ac.length],["Vs Competencia",ac.filter(a=>a.esComp).length],["Chequeos de precios",pr.length],["Inventarios cíclicos",inv.length],["Averías registradas",av.length]].map(([l,v]) =>
+      {/* Acumulado */}
+      <div style={{background:"white",borderRadius:"20px",padding:"16px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>📦 Acumulado Total</h3>
+        {[["Asistencias",as.length,"#3B6FE8"],["Actividades",ac.length,"#F97316"],["Chequeos precio",pr.length,"#0D9488"],["Inventarios",inv.length,"#6366F1"],["Averías",av.length,"#EF4444"]].map(([l,v,c]) => (
           <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #F0F4FF"}}>
             <span style={{fontSize:"13px",color:"#475569"}}>{l}</span>
-            <span style={{fontWeight:"900",color:"#0F2167",fontSize:"14px"}}>{v}</span>
+            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+              <div style={{width:"60px",height:"6px",background:"#F0F4FF",borderRadius:"3px",overflow:"hidden"}}>
+                <div style={{width:Math.min((v/Math.max(as.length,1))*100,100)+"%",height:"100%",background:c,borderRadius:"3px",transition:"width 0.4s"}}/>
+              </div>
+              <span style={{fontWeight:"900",color:"#0F2167",fontSize:"14px",minWidth:"20px",textAlign:"right"}}>{v}</span>
+            </div>
           </div>
-        )}
-      </Card>
+        ))}
+      </div>
+
+      <div style={{textAlign:"center",paddingBottom:"8px"}}>
+        <button onClick={limpiar} style={{background:"none",border:"1px solid #E2E8F0",borderRadius:"10px",padding:"8px 20px",fontSize:"11px",color:"#94A3B8",cursor:"pointer",fontFamily:"inherit",fontWeight:"600"}}>
+          🗑️ Limpiar registros de días anteriores
+        </button>
+      </div>
     </div>
   );
 }
