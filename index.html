@@ -1004,7 +1004,7 @@ function DetalleMetc({nombre, datos, onClose}) {
   const total = Object.values(datos).reduce((a,v)=>a+v,0);
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(15,33,103,0.6)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(15,33,103,0.6)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
       onClick={onClose}>
       <div style={{background:"white",borderRadius:"24px 24px 0 0",padding:"24px",width:"100%",maxWidth:"420px",maxHeight:"80vh",overflowY:"auto"}}
         onClick={e=>e.stopPropagation()}>
@@ -1187,7 +1187,7 @@ function Supervisor() {
             const total = Object.values(datos).reduce((a,v)=>a+v,0);
             return (
               <div key={m.id}
-                onClick={() => setDetalle({nombre:m.nombre, datos})}
+                onClick={() => setDetalle({nombre:m.nombre, datos:datos})}
                 style={{background:"white",borderRadius:"14px",padding:"12px",marginBottom:"8px",
                   boxShadow:"0 1px 3px rgba(0,0,0,0.05)",cursor:"pointer",
                   border:`2px solid ${tieneAlgo?"#A7F3D0":"#FEE2E2"}`,
@@ -1196,7 +1196,7 @@ function Supervisor() {
                   <div>
                     <p style={{fontWeight:"800",fontSize:"13px",color:"#0F2167",margin:"0 0 1px 0"}}>{m.nombre}</p>
                     <p style={{fontSize:"10px",color:tieneAlgo?"#0D9488":"#EF4444",margin:0,fontWeight:"700"}}>
-                      {tieneAlgo ? `${total} registros · Ver detalle →` : "Sin actividad hoy"}
+                      {tieneAlgo ? `${total} registros · Ver detalle` : "Sin actividad hoy"}
                     </p>
                   </div>
                   {HOJAS.map(h => {
