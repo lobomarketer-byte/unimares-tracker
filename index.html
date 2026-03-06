@@ -993,165 +993,122 @@ function ChequeoMasivo({data, setData}) {
 
 
 // ── SUPERVISOR ─────────────────────────────────────────────────────────────
-function DetalleMetc({nombre, datos, onClose}) {
-  const HOJAS = [
-    {key:"Asistencia",  icon:"🕐", color:"#3B6FE8"},
-    {key:"Actividades", icon:"📸", color:"#F97316"},
-    {key:"ChequeoMasivo",icon:"🏷️",color:"#0D9488"},
-    {key:"Inventario",  icon:"📦", color:"#6366F1"},
-    {key:"Averias",     icon:"⚠️", color:"#EF4444"},
-  ];
-  const total = Object.values(datos).reduce((a,v)=>a+v,0);
-
-  return (
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(15,33,103,0.6)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
-      onClick={onClose}>
-      <div style={{background:"white",borderRadius:"24px 24px 0 0",padding:"24px",width:"100%",maxWidth:"420px",maxHeight:"80vh",overflowY:"auto"}}
-        onClick={e=>e.stopPropagation()}>
-
-        {/* Handle */}
-        <div style={{width:"40px",height:"4px",background:"#E2E8F0",borderRadius:"2px",margin:"0 auto 20px"}}/>
-
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
-          <div>
-            <h3 style={{fontWeight:"900",fontSize:"18px",color:"#0F2167",margin:"0 0 2px 0"}}>{nombre}</h3>
-            <p style={{fontSize:"12px",color:"#6B7B9E",margin:0}}>{total} registros totales</p>
-          </div>
-          <button onClick={onClose} style={{background:"#F0F4FF",border:"none",borderRadius:"10px",padding:"8px 12px",cursor:"pointer",fontSize:"16px"}}>✕</button>
-        </div>
-
-        {/* Módulos */}
-        {HOJAS.map(h => {
-          const cant = datos[h.key] || 0;
-          const pct = total > 0 ? Math.round((cant/total)*100) : 0;
-          return (
-            <div key={h.key} style={{marginBottom:"14px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                  <span style={{fontSize:"18px"}}>{h.icon}</span>
-                  <span style={{fontSize:"13px",fontWeight:"700",color:"#1a2240"}}>{h.key}</span>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                  <span style={{fontSize:"12px",color:"#6B7B9E"}}>{pct}%</span>
-                  <div style={{background:cant>0?"#EEF2FF":"#F1F5F9",borderRadius:"8px",padding:"3px 10px",minWidth:"36px",textAlign:"center"}}>
-                    <span style={{fontSize:"13px",fontWeight:"900",color:cant>0?h.color:"#CBD5E1"}}>{cant}</span>
-                  </div>
-                </div>
-              </div>
-              {/* Barra progreso */}
-              <div style={{height:"6px",background:"#F0F4FF",borderRadius:"3px",overflow:"hidden"}}>
-                <div style={{width:pct+"%",height:"100%",background:h.color,borderRadius:"3px",transition:"width 0.5s ease"}}/>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Sin datos */}
-        {total === 0 && (
-          <div style={{textAlign:"center",padding:"20px"}}>
-            <p style={{fontSize:"32px",margin:"0 0 8px"}}>📭</p>
-            <p style={{color:"#94A3B8",fontSize:"13px",fontWeight:"600",margin:0}}>Sin registros para esta fecha</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Supervisor() {
   const [fecha, setFecha] = React.useState(HOY());
   const [resumen, setResumen] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
-  const [detalle, setDetalle] = React.useState(null);
+  const [selMerc, setSelMerc] = React.useState(null);
 
-  const cargar = () => {
+  const HOJAS = ["Asistencia","Actividades","ChequeoMasivo","Inventario","Averias"];
+  const ICONS = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron scaron scaron","Inventario":"scaron scaron scaron scaron","Averias":"scaron scaron scaron scaron scaron"};
+
+  const cargar = function() {
     setLoading(true);
     setError(null);
     setResumen(null);
-
-    const cbName = "uniCb_" + Date.now();
-    const url = SCRIPT_URL + "?fecha=" + fecha + "&callback=" + cbName;
-    const script = document.createElement("script");
+    var cbName = "uniCb_" + Date.now();
+    var url = SCRIPT_URL + "?fecha=" + fecha + "&callback=" + cbName;
+    var script = document.createElement("script");
     script.type = "text/javascript";
     script.src = url;
-
-    const timer = setTimeout(() => {
+    var timer = setTimeout(function() {
       cleanup();
       setLoading(false);
-      setError("Tiempo agotado. Verifica la implementación del Apps Script.");
+      setError("Tiempo agotado. Verifica el Apps Script.");
     }, 12000);
-
-    const cleanup = () => {
-      try { delete window[cbName]; } catch(e) {}
-      try { if (script.parentNode) document.body.removeChild(script); } catch(e) {}
+    var cleanup = function() {
+      try { delete window[cbName]; } catch(e2) {}
+      try { if (script.parentNode) document.body.removeChild(script); } catch(e2) {}
       clearTimeout(timer);
     };
-
-    window[cbName] = (json) => {
+    window[cbName] = function(json) {
       cleanup();
       setLoading(false);
-      if (json && json.status === "ok") setResumen(json.resumen);
-      else setError((json && json.msg) || "Error al leer Sheets");
+      if (json && json.status === "ok") { setResumen(json.resumen); }
+      else { setError((json && json.msg) || "Error al leer Sheets"); }
     };
-
-    script.onerror = () => {
+    script.onerror = function() {
       cleanup();
       setLoading(false);
-      fetch(SCRIPT_URL + "?fecha=" + fecha, {mode:"cors"})
-        .then(r => r.json())
-        .then(json => {
-          if (json.status === "ok") setResumen(json.resumen);
-          else setError(json.msg || "Error");
-        })
-        .catch(() => setError("No se pudo conectar. Verifica tu conexión."));
+      setError("No se pudo conectar. Verifica tu conexion.");
     };
-
     document.body.appendChild(script);
   };
 
-  React.useEffect(() => { cargar(); }, []);
+  React.useEffect(function() { cargar(); }, []);
 
-  const HOJAS = [
-    {key:"Asistencia",   icon:"🕐", label:"Asist."},
-    {key:"Actividades",  icon:"📸", label:"Activ."},
-    {key:"ChequeoMasivo",icon:"🏷️", label:"Precios"},
-    {key:"Inventario",   icon:"📦", label:"Inv."},
-    {key:"Averias",      icon:"⚠️", label:"Aver."},
-  ];
+  var totalHoy = resumen ? Object.keys(resumen).length : 0;
+  var totalRegs = resumen ? Object.values(resumen).reduce(function(a,m){ return a + Object.values(m).reduce(function(b,v){ return b+v; },0); },0) : 0;
 
-  const totalHoy = resumen ? Object.keys(resumen).length : 0;
-  const totalRegistros = resumen ? Object.values(resumen).reduce((a,m)=>a+Object.values(m).reduce((b,v)=>b+v,0),0) : 0;
+  if (selMerc !== null) {
+    var datos = (resumen && resumen[selMerc]) || {};
+    var totalMerc = Object.values(datos).reduce(function(a,v){ return a+v; },0);
+    return (
+      <div>
+        <button onClick={function(){ setSelMerc(null); }}
+          style={{display:"flex",alignItems:"center",gap:"8px",background:"white",border:"1px solid #E8EDF8",borderRadius:"12px",padding:"10px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"700",color:"#0F2167",marginBottom:"16px",fontSize:"13px"}}>
+          &lt; Volver
+        </button>
+        <div style={{background:"linear-gradient(135deg,#0F766E,#0D9488)",borderRadius:"20px",padding:"16px",marginBottom:"16px"}}>
+          <p style={{color:"white",fontWeight:"900",fontSize:"18px",margin:"0 0 2px 0"}}>{selMerc}</p>
+          <p style={{color:"rgba(255,255,255,0.7)",fontSize:"12px",margin:0}}>{totalMerc} registros el {fecha}</p>
+        </div>
+        {HOJAS.map(function(h) {
+          var cant = datos[h] || 0;
+          var pct = totalMerc > 0 ? Math.round((cant/totalMerc)*100) : 0;
+          var colores = {"Asistencia":"#3B6FE8","Actividades":"#F97316","ChequeoMasivo":"#0D9488","Inventario":"#6366F1","Averias":"#EF4444"};
+          var iconos = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron scaron","Inventario":"scaron scaron scaron","Averias":"scaron scaron scaron scaron"};
+          var emojis = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron","Inventario":"scaron scaron","Averias":"scaron"};
+          var emojiMap = {"Asistencia":"🕐","Actividades":"📸","ChequeoMasivo":"🏷️","Inventario":"📦","Averias":"⚠️"};
+          var col = colores[h] || "#3B6FE8";
+          return (
+            <div key={h} style={{background:"white",borderRadius:"14px",padding:"14px",marginBottom:"10px",border:"1px solid #E8EDF8"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                  <span style={{fontSize:"18px"}}>{emojiMap[h]}</span>
+                  <span style={{fontSize:"13px",fontWeight:"800",color:"#1a2240"}}>{h}</span>
+                </div>
+                <div style={{background:cant>0?"#DCFCE7":"#F1F5F9",borderRadius:"8px",padding:"4px 12px"}}>
+                  <span style={{fontSize:"14px",fontWeight:"900",color:cant>0?"#16A34A":"#CBD5E1"}}>{cant}</span>
+                </div>
+              </div>
+              <div style={{height:"8px",background:"#F0F4FF",borderRadius:"4px",overflow:"hidden"}}>
+                <div style={{width:pct+"%",height:"100%",background:col,borderRadius:"4px"}}/>
+              </div>
+              <p style={{fontSize:"11px",color:"#94A3B8",margin:"4px 0 0",fontWeight:"600"}}>{pct}% del total</p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div>
-      {detalle && <DetalleMetc nombre={detalle.nombre} datos={detalle.datos} onClose={()=>setDetalle(null)}/>}
-
-      {/* Header */}
       <div style={{background:"linear-gradient(135deg,#0F766E,#0D9488)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:"-30px",right:"-30px",width:"120px",height:"120px",background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
         <h2 style={{color:"white",fontWeight:"900",fontSize:"22px",margin:"0 0 4px 0",position:"relative",zIndex:1}}>👔 Supervisor</h2>
-        <p style={{color:"rgba(255,255,255,0.75)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Toca un mercaderista para ver su detalle</p>
+        <p style={{color:"rgba(255,255,255,0.75)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Toca un nombre para ver su detalle</p>
       </div>
 
-      {/* Selector fecha + botón */}
-      <div style={{background:"white",borderRadius:"16px",padding:"14px",marginBottom:"12px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",border:"1px solid #E8EDF8"}}>
+      <div style={{background:"white",borderRadius:"16px",padding:"14px",marginBottom:"12px",border:"1px solid #E8EDF8"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:"10px",alignItems:"flex-end"}}>
-          <Field label="Fecha a consultar" type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
+          <Field label="Fecha" type="date" value={fecha} onChange={function(e){ setFecha(e.target.value); }}/>
           <button onClick={cargar} disabled={loading}
-            style={{background:"linear-gradient(135deg,#0F766E,#0D9488)",color:"white",border:"none",borderRadius:"12px",padding:"10px 16px",fontWeight:"800",fontSize:"13px",cursor:"pointer",fontFamily:"inherit",marginBottom:"12px",whiteSpace:"nowrap"}}>
-            {loading ? "⏳" : "🔄 Actualizar"}
+            style={{background:"linear-gradient(135deg,#0F766E,#0D9488)",color:"white",border:"none",borderRadius:"12px",padding:"10px 16px",fontWeight:"800",fontSize:"13px",cursor:"pointer",fontFamily:"inherit",marginBottom:"12px"}}>
+            {loading ? "⏳" : "🔄"}
           </button>
         </div>
         {resumen && (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginTop:"4px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
             <div style={{background:"#CCFBF1",borderRadius:"10px",padding:"8px",textAlign:"center"}}>
               <p style={{fontSize:"22px",fontWeight:"900",color:"#0F766E",margin:0}}>{totalHoy}</p>
-              <p style={{fontSize:"10px",color:"#0D9488",fontWeight:"700",margin:0}}>Mercaderistas activos</p>
+              <p style={{fontSize:"10px",color:"#0D9488",fontWeight:"700",margin:0}}>Activos hoy</p>
             </div>
             <div style={{background:"#DBEAFE",borderRadius:"10px",padding:"8px",textAlign:"center"}}>
-              <p style={{fontSize:"22px",fontWeight:"900",color:"#1E40AF",margin:0}}>{totalRegistros}</p>
-              <p style={{fontSize:"10px",color:"#2563EB",fontWeight:"700",margin:0}}>Total registros hoy</p>
+              <p style={{fontSize:"22px",fontWeight:"900",color:"#1E40AF",margin:0}}>{totalRegs}</p>
+              <p style={{fontSize:"10px",color:"#2563EB",fontWeight:"700",margin:0}}>Total registros</p>
             </div>
           </div>
         )}
@@ -1164,78 +1121,53 @@ function Supervisor() {
       )}
 
       {loading && (
-        <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
-          <p style={{fontSize:"28px",margin:"0 0 8px 0"}}>⏳</p>
+        <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center"}}>
+          <p style={{fontSize:"28px",margin:"0 0 8px"}}>⏳</p>
           <p style={{color:"#6B7B9E",fontSize:"13px",fontWeight:"600",margin:0}}>Consultando Google Sheets...</p>
         </div>
       )}
 
-      {/* Tabla mercaderistas */}
-      {resumen && !loading && (
-        <div>
-          {/* Header columnas */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,36px)",gap:"4px",padding:"6px 12px",marginBottom:"4px"}}>
-            <span style={{fontSize:"10px",fontWeight:"800",color:"#94A3B8",textTransform:"uppercase"}}>Mercaderista</span>
-            {HOJAS.map(h=>(
-              <span key={h.key} style={{fontSize:"14px",textAlign:"center"}} title={h.label}>{h.icon}</span>
-            ))}
-          </div>
-
-          {MERCS.map(m => {
-            const datos = resumen[m.nombre] || {};
-            const tieneAlgo = Object.keys(datos).length > 0;
-            const total = Object.values(datos).reduce((a,v)=>a+v,0);
-            return (
-              <div key={m.id}
-                onClick={() => setDetalle({nombre:m.nombre, datos:datos})}
-                style={{background:"white",borderRadius:"14px",padding:"12px",marginBottom:"8px",
-                  boxShadow:"0 1px 3px rgba(0,0,0,0.05)",cursor:"pointer",
-                  border:`2px solid ${tieneAlgo?"#A7F3D0":"#FEE2E2"}`,
-                  transition:"transform 0.1s, box-shadow 0.1s"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,36px)",gap:"4px",alignItems:"center"}}>
-                  <div>
-                    <p style={{fontWeight:"800",fontSize:"13px",color:"#0F2167",margin:"0 0 1px 0"}}>{m.nombre}</p>
-                    <p style={{fontSize:"10px",color:tieneAlgo?"#0D9488":"#EF4444",margin:0,fontWeight:"700"}}>
-                      {tieneAlgo ? `${total} registros · Ver detalle` : "Sin actividad hoy"}
-                    </p>
-                  </div>
-                  {HOJAS.map(h => {
-                    const cant = datos[h.key] || 0;
-                    return (
-                      <div key={h.key} style={{textAlign:"center"}}>
-                        {cant > 0
-                          ? <div style={{background:"#DCFCE7",borderRadius:"8px",padding:"3px 0"}}>
-                              <span style={{fontSize:"11px",fontWeight:"900",color:"#16A34A"}}>{cant}</span>
-                            </div>
-                          : <div style={{background:"#F1F5F9",borderRadius:"8px",padding:"3px 0"}}>
-                              <span style={{fontSize:"11px",color:"#CBD5E1"}}>—</span>
-                            </div>
-                        }
-                      </div>
-                    );
-                  })}
-                </div>
+      {resumen && !loading && MERCS.map(function(m) {
+        var datos = resumen[m.nombre] || {};
+        var tieneAlgo = Object.keys(datos).length > 0;
+        var total = Object.values(datos).reduce(function(a,v){ return a+v; },0);
+        var emojiMap = {"Asistencia":"🕐","Actividades":"📸","ChequeoMasivo":"🏷️","Inventario":"📦","Averias":"⚠️"};
+        return (
+          <div key={m.id} onClick={function(){ setSelMerc(m.nombre); }}
+            style={{background:"white",borderRadius:"14px",padding:"12px",marginBottom:"8px",cursor:"pointer",
+              border:"2px solid "+(tieneAlgo?"#A7F3D0":"#FEE2E2")}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:tieneAlgo?"8px":"0"}}>
+              <div>
+                <p style={{fontWeight:"800",fontSize:"13px",color:"#0F2167",margin:"0 0 2px 0"}}>{m.nombre}</p>
+                <p style={{fontSize:"11px",color:tieneAlgo?"#0D9488":"#EF4444",margin:0,fontWeight:"700"}}>
+                  {tieneAlgo ? total+" registros — ver detalle" : "Sin actividad hoy"}
+                </p>
               </div>
-            );
-          })}
-
-          {/* Leyenda */}
-          <div style={{background:"#F8FAFF",borderRadius:"12px",padding:"10px 14px",marginTop:"8px"}}>
-            <p style={{fontSize:"10px",fontWeight:"700",color:"#94A3B8",margin:"0 0 4px 0",textTransform:"uppercase"}}>Leyenda · Toca cualquier fila para ver detalle</p>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-              {HOJAS.map(h=>(
-                <span key={h.key} style={{fontSize:"11px",color:"#475569"}}>{h.icon} {h.label}</span>
-              ))}
+              <span style={{fontSize:"18px",color:"#94A3B8"}}>›</span>
             </div>
+            {tieneAlgo && (
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {HOJAS.map(function(h) {
+                  var cant = datos[h] || 0;
+                  if (!cant) return null;
+                  return (
+                    <div key={h} style={{background:"#EEF2FF",borderRadius:"8px",padding:"3px 8px",display:"flex",gap:"4px",alignItems:"center"}}>
+                      <span style={{fontSize:"11px"}}>{emojiMap[h]}</span>
+                      <span style={{fontSize:"11px",fontWeight:"800",color:"#3B6FE8"}}>{cant}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })}
 
       {resumen && !loading && Object.keys(resumen).length === 0 && (
-        <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
-          <p style={{fontSize:"32px",margin:"0 0 8px 0"}}>📭</p>
-          <p style={{color:"#1a2240",fontWeight:"800",fontSize:"14px",margin:"0 0 4px 0"}}>Sin registros para esta fecha</p>
-          <p style={{color:"#94A3B8",fontSize:"12px",margin:0}}>El equipo aún no ha subido actividades</p>
+        <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center"}}>
+          <p style={{fontSize:"32px",margin:"0 0 8px"}}>📭</p>
+          <p style={{color:"#1a2240",fontWeight:"800",fontSize:"14px",margin:"0 0 4px"}}>Sin registros para esta fecha</p>
+          <p style={{color:"#94A3B8",fontSize:"12px",margin:0}}>El equipo aun no ha subido actividades</p>
         </div>
       )}
     </div>
