@@ -1001,8 +1001,6 @@ function Supervisor() {
   const [selMerc, setSelMerc] = React.useState(null);
 
   const HOJAS = ["Asistencia","Actividades","ChequeoMasivo","Inventario","Averias"];
-  const ICONS = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron scaron scaron","Inventario":"scaron scaron scaron scaron","Averias":"scaron scaron scaron scaron scaron"};
-
   const cargar = function() {
     setLoading(true);
     setError(null);
@@ -1058,8 +1056,6 @@ function Supervisor() {
           var cant = datos[h] || 0;
           var pct = totalMerc > 0 ? Math.round((cant/totalMerc)*100) : 0;
           var colores = {"Asistencia":"#3B6FE8","Actividades":"#F97316","ChequeoMasivo":"#0D9488","Inventario":"#6366F1","Averias":"#EF4444"};
-          var iconos = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron scaron","Inventario":"scaron scaron scaron","Averias":"scaron scaron scaron scaron"};
-          var emojis = {"Asistencia":"scaron","Actividades":"scaron scaron","ChequeoMasivo":"scaron","Inventario":"scaron scaron","Averias":"scaron"};
           var emojiMap = {"Asistencia":"🕐","Actividades":"📸","ChequeoMasivo":"🏷️","Inventario":"📦","Averias":"⚠️"};
           var col = colores[h] || "#3B6FE8";
           return (
@@ -1180,7 +1176,7 @@ const loadStore = () => { try { const r = localStorage.getItem(STORE_KEY); retur
 const saveStore = (k, v) => { try { const s = loadStore(); s[k]=v; localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} };
 
 function usePersistedState(key, def) {
-  const [val, setVal] = React.useState(() => { const s = loadStore(); return s[key] ?? def; });
+  const [val, setVal] = React.useState(() => { const s = loadStore(); return s[key] !== undefined ? s[key] : def; });
   React.useEffect(() => { saveStore(key, val); }, [val]);
   return [val, setVal];
 }
