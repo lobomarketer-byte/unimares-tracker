@@ -19,7 +19,7 @@
 <script type="text/babel">
 const { useState, useCallback } = React;
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymo_tXc4NV-HrHkjjmadL6GSzwoSSnTRyiX-tzfsULSZ6wyAZlmhDeGAWBbKnNk2NYMQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwETa6FN3QEWocrTRxVU34puuzgfTLu4kPfeExlfAPQwKfhqzpIc8t-vES8vfIvWHLR9Q/exec";
 
 const ALMACENES = ["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","Olímpica Ibagué","Populares","Surtiplaza La 37","Surtiplaza Acqua","Surtiplaza El Salado"];
 const MERCS = [{id:1,nombre:"Ruby Gracia",almacen:"Todos",rol:"Mercaderista"},{id:2,nombre:"Mercadeo 1",almacen:"",rol:"Mercaderista"},{id:3,nombre:"Mercadeo 2",almacen:"",rol:"Mercaderista"},{id:4,nombre:"Supervisor / Jefe",almacen:"Todos",rol:"Supervisor"}];
@@ -834,38 +834,45 @@ function Supervisor() {
     setError(null);
     setResumen(null);
 
-    // Usamos JSONP para evitar bloqueo CORS de Google
-    const cbName = "cb_" + Date.now();
-    const script = document.createElement("script");
+    const cbName = "uniCb_" + Date.now();
     const url = SCRIPT_URL + "?fecha=" + fecha + "&callback=" + cbName;
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = url;
 
     const timer = setTimeout(() => {
       cleanup();
       setLoading(false);
-      setError("Tiempo agotado. Verifica que el Apps Script esté publicado como 'Cualquier persona'.");
-    }, 10000);
+      setError("Tiempo agotado. Verifica la implementación del Apps Script.");
+    }, 12000);
 
     const cleanup = () => {
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+      try { delete window[cbName]; } catch(e) {}
+      try { if (script.parentNode) document.body.removeChild(script); } catch(e) {}
       clearTimeout(timer);
     };
 
     window[cbName] = (json) => {
       cleanup();
       setLoading(false);
-      if (json.status === "ok") setResumen(json.resumen);
-      else setError(json.msg || "Error al leer Sheets");
+      if (json && json.status === "ok") setResumen(json.resumen);
+      else setError((json && json.msg) || "Error al leer Sheets");
     };
 
     script.onerror = () => {
       cleanup();
       setLoading(false);
-      setError("No se pudo conectar con Google Sheets.");
+      // Intentar fetch como fallback
+      fetch(SCRIPT_URL + "?fecha=" + fecha, {mode:"cors"})
+        .then(r => r.json())
+        .then(json => {
+          if (json.status === "ok") setResumen(json.resumen);
+          else setError(json.msg || "Error");
+        })
+        .catch(() => setError("No se pudo conectar. Verifica tu conexión."));
     };
 
-    script.src = url;
-    document.head.appendChild(script);
+    document.body.appendChild(script);
   };
 
   React.useEffect(() => { cargar(); }, []);
