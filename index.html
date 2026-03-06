@@ -155,7 +155,7 @@ function Dashboard({as, ac, pr, inv, av}) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative",zIndex:1}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-              <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo1.png" alt="Unimares" style={{height:"44px",objectFit:"contain",maxWidth:"180px"}}/>
+              <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo10.png" alt="Unimares" style={{height:"44px",objectFit:"contain",maxWidth:"180px"}}/>
             </div>
             <p style={{color:"#93C5FD",fontSize:"12px",margin:"0 0 2px 0",fontWeight:"500"}}>Gestión Mercaderistas · Ibagué</p>
             <p style={{color:"#60A5FA",fontSize:"11px",margin:0}}>{new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"})}</p>
@@ -848,12 +848,12 @@ function App() {
     <div style={{minHeight:"100vh",background:"#F0F4FF",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       <div style={{maxWidth:"420px",margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
         {/* Top bar con logo y fecha */}
-        <div style={{background:"white",padding:"8px 16px",position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 12px rgba(15,33,103,0.15)",borderBottom:"3px solid #0F2167"}}>
+        <div style={{background:"linear-gradient(135deg,#0F2167,#1a3a8f)",padding:"8px 16px",position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 12px rgba(15,33,103,0.4)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo1.png" alt="Unimares" style={{height:"36px",objectFit:"contain",maxWidth:"160px"}}/>
+            <img src="https://lobomarketer-byte.github.io/unimares-tracker/logo10.png" alt="Unimares" style={{height:"36px",objectFit:"contain",maxWidth:"160px"}}/>
             <div style={{textAlign:"right"}}>
-              <p style={{color:"#0F2167",fontSize:"10px",margin:0,fontWeight:"600",textTransform:"capitalize",lineHeight:"1.4"}}>{fechaHoy()}</p>
-              <p style={{color:"#6B7B9E",fontSize:"10px",margin:0,fontWeight:"500"}}>Ibagué · Colombia</p>
+              <p style={{color:"#93C5FD",fontSize:"10px",margin:0,fontWeight:"600",textTransform:"capitalize",lineHeight:"1.4"}}>{fechaHoy()}</p>
+              <p style={{color:"#60A5FA",fontSize:"10px",margin:0,fontWeight:"500"}}>Ibagué · Colombia</p>
             </div>
           </div>
         </div>
