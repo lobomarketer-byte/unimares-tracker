@@ -17,6 +17,14 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
+window.onerror = function(msg, src, line, col, err) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;background:#fff;color:#c00">' +
+    '<h2>Error detectado:</h2>' +
+    '<p>' + msg + '</p>' +
+    '<p>Linea: ' + line + ', Col: ' + col + '</p>' +
+    '<p>' + (err ? err.stack : '') + '</p>' +
+    '</div>';
+};
 const { useState, useCallback } = React;
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwETa6FN3QEWocrTRxVU34puuzgfTLu4kPfeExlfAPQwKfhqzpIc8t-vES8vfIvWHLR9Q/exec";
