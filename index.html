@@ -993,11 +993,77 @@ function ChequeoMasivo({data, setData}) {
 
 
 // ── SUPERVISOR ─────────────────────────────────────────────────────────────
+function DetalleMetc({nombre, datos, onClose}) {
+  const HOJAS = [
+    {key:"Asistencia",  icon:"🕐", color:"#3B6FE8"},
+    {key:"Actividades", icon:"📸", color:"#F97316"},
+    {key:"ChequeoMasivo",icon:"🏷️",color:"#0D9488"},
+    {key:"Inventario",  icon:"📦", color:"#6366F1"},
+    {key:"Averias",     icon:"⚠️", color:"#EF4444"},
+  ];
+  const total = Object.values(datos).reduce((a,v)=>a+v,0);
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,33,103,0.6)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={onClose}>
+      <div style={{background:"white",borderRadius:"24px 24px 0 0",padding:"24px",width:"100%",maxWidth:"420px",maxHeight:"80vh",overflowY:"auto"}}
+        onClick={e=>e.stopPropagation()}>
+
+        {/* Handle */}
+        <div style={{width:"40px",height:"4px",background:"#E2E8F0",borderRadius:"2px",margin:"0 auto 20px"}}/>
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+          <div>
+            <h3 style={{fontWeight:"900",fontSize:"18px",color:"#0F2167",margin:"0 0 2px 0"}}>{nombre}</h3>
+            <p style={{fontSize:"12px",color:"#6B7B9E",margin:0}}>{total} registros totales</p>
+          </div>
+          <button onClick={onClose} style={{background:"#F0F4FF",border:"none",borderRadius:"10px",padding:"8px 12px",cursor:"pointer",fontSize:"16px"}}>✕</button>
+        </div>
+
+        {/* Módulos */}
+        {HOJAS.map(h => {
+          const cant = datos[h.key] || 0;
+          const pct = total > 0 ? Math.round((cant/total)*100) : 0;
+          return (
+            <div key={h.key} style={{marginBottom:"14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                  <span style={{fontSize:"18px"}}>{h.icon}</span>
+                  <span style={{fontSize:"13px",fontWeight:"700",color:"#1a2240"}}>{h.key}</span>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                  <span style={{fontSize:"12px",color:"#6B7B9E"}}>{pct}%</span>
+                  <div style={{background:cant>0?"#EEF2FF":"#F1F5F9",borderRadius:"8px",padding:"3px 10px",minWidth:"36px",textAlign:"center"}}>
+                    <span style={{fontSize:"13px",fontWeight:"900",color:cant>0?h.color:"#CBD5E1"}}>{cant}</span>
+                  </div>
+                </div>
+              </div>
+              {/* Barra progreso */}
+              <div style={{height:"6px",background:"#F0F4FF",borderRadius:"3px",overflow:"hidden"}}>
+                <div style={{width:pct+"%",height:"100%",background:h.color,borderRadius:"3px",transition:"width 0.5s ease"}}/>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Sin datos */}
+        {total === 0 && (
+          <div style={{textAlign:"center",padding:"20px"}}>
+            <p style={{fontSize:"32px",margin:"0 0 8px"}}>📭</p>
+            <p style={{color:"#94A3B8",fontSize:"13px",fontWeight:"600",margin:0}}>Sin registros para esta fecha</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Supervisor() {
   const [fecha, setFecha] = React.useState(HOY());
   const [resumen, setResumen] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [detalle, setDetalle] = React.useState(null);
 
   const cargar = () => {
     setLoading(true);
@@ -1032,7 +1098,6 @@ function Supervisor() {
     script.onerror = () => {
       cleanup();
       setLoading(false);
-      // Intentar fetch como fallback
       fetch(SCRIPT_URL + "?fecha=" + fecha, {mode:"cors"})
         .then(r => r.json())
         .then(json => {
@@ -1048,23 +1113,25 @@ function Supervisor() {
   React.useEffect(() => { cargar(); }, []);
 
   const HOJAS = [
-    {key:"Asistencia",  icon:"🕐", label:"Asist."},
-    {key:"Actividades", icon:"📸", label:"Activ."},
-    {key:"ChequeoMasivo",icon:"🏷️",label:"Precios"},
-    {key:"Inventario",  icon:"📦", label:"Inv."},
-    {key:"Averias",     icon:"⚠️", label:"Aver."},
+    {key:"Asistencia",   icon:"🕐", label:"Asist."},
+    {key:"Actividades",  icon:"📸", label:"Activ."},
+    {key:"ChequeoMasivo",icon:"🏷️", label:"Precios"},
+    {key:"Inventario",   icon:"📦", label:"Inv."},
+    {key:"Averias",      icon:"⚠️", label:"Aver."},
   ];
 
   const totalHoy = resumen ? Object.keys(resumen).length : 0;
-  const totalRegistros = resumen ? Object.values(resumen).reduce((a,m) => a + Object.values(m).reduce((b,v)=>b+v,0), 0) : 0;
+  const totalRegistros = resumen ? Object.values(resumen).reduce((a,m)=>a+Object.values(m).reduce((b,v)=>b+v,0),0) : 0;
 
   return (
     <div>
+      {detalle && <DetalleMetc nombre={detalle.nombre} datos={detalle.datos} onClose={()=>setDetalle(null)}/>}
+
       {/* Header */}
       <div style={{background:"linear-gradient(135deg,#0F766E,#0D9488)",borderRadius:"24px",padding:"20px",marginBottom:"16px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:"-30px",right:"-30px",width:"120px",height:"120px",background:"rgba(255,255,255,0.07)",borderRadius:"50%"}}/>
         <h2 style={{color:"white",fontWeight:"900",fontSize:"22px",margin:"0 0 4px 0",position:"relative",zIndex:1}}>👔 Supervisor</h2>
-        <p style={{color:"rgba(255,255,255,0.75)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Vista de gestión del equipo en tiempo real</p>
+        <p style={{color:"rgba(255,255,255,0.75)",fontSize:"12px",margin:0,position:"relative",zIndex:1}}>Toca un mercaderista para ver su detalle</p>
       </div>
 
       {/* Selector fecha + botón */}
@@ -1090,14 +1157,12 @@ function Supervisor() {
         )}
       </div>
 
-      {/* Error */}
       {error && (
         <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:"14px",padding:"14px",marginBottom:"12px",textAlign:"center"}}>
           <p style={{color:"#DC2626",fontWeight:"700",fontSize:"13px",margin:0}}>❌ {error}</p>
         </div>
       )}
 
-      {/* Loading */}
       {loading && (
         <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
           <p style={{fontSize:"28px",margin:"0 0 8px 0"}}>⏳</p>
@@ -1105,13 +1170,13 @@ function Supervisor() {
         </div>
       )}
 
-      {/* Tabla por mercaderista */}
+      {/* Tabla mercaderistas */}
       {resumen && !loading && (
         <div>
-          {/* Header tabla */}
+          {/* Header columnas */}
           <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,36px)",gap:"4px",padding:"6px 12px",marginBottom:"4px"}}>
             <span style={{fontSize:"10px",fontWeight:"800",color:"#94A3B8",textTransform:"uppercase"}}>Mercaderista</span>
-            {HOJAS.map(h => (
+            {HOJAS.map(h=>(
               <span key={h.key} style={{fontSize:"14px",textAlign:"center"}} title={h.label}>{h.icon}</span>
             ))}
           </div>
@@ -1119,22 +1184,30 @@ function Supervisor() {
           {MERCS.map(m => {
             const datos = resumen[m.nombre] || {};
             const tieneAlgo = Object.keys(datos).length > 0;
+            const total = Object.values(datos).reduce((a,v)=>a+v,0);
             return (
-              <div key={m.id} style={{background:"white",borderRadius:"14px",padding:"12px",marginBottom:"8px",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",border:`2px solid ${tieneAlgo?"#A7F3D0":"#FEE2E2"}`}}>
+              <div key={m.id}
+                onClick={() => setDetalle({nombre:m.nombre, datos})}
+                style={{background:"white",borderRadius:"14px",padding:"12px",marginBottom:"8px",
+                  boxShadow:"0 1px 3px rgba(0,0,0,0.05)",cursor:"pointer",
+                  border:`2px solid ${tieneAlgo?"#A7F3D0":"#FEE2E2"}`,
+                  transition:"transform 0.1s, box-shadow 0.1s"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr repeat(5,36px)",gap:"4px",alignItems:"center"}}>
                   <div>
                     <p style={{fontWeight:"800",fontSize:"13px",color:"#0F2167",margin:"0 0 1px 0"}}>{m.nombre}</p>
-                    <p style={{fontSize:"10px",color:"#6B7B9E",margin:0}}>{tieneAlgo ? `${Object.values(datos).reduce((a,v)=>a+v,0)} registros` : "Sin actividad hoy"}</p>
+                    <p style={{fontSize:"10px",color:tieneAlgo?"#0D9488":"#EF4444",margin:0,fontWeight:"700"}}>
+                      {tieneAlgo ? `${total} registros · Ver detalle →` : "Sin actividad hoy"}
+                    </p>
                   </div>
                   {HOJAS.map(h => {
                     const cant = datos[h.key] || 0;
                     return (
                       <div key={h.key} style={{textAlign:"center"}}>
                         {cant > 0
-                          ? <div style={{background:"#DCFCE7",borderRadius:"8px",padding:"3px 0",minWidth:"32px"}}>
+                          ? <div style={{background:"#DCFCE7",borderRadius:"8px",padding:"3px 0"}}>
                               <span style={{fontSize:"11px",fontWeight:"900",color:"#16A34A"}}>{cant}</span>
                             </div>
-                          : <div style={{background:"#F1F5F9",borderRadius:"8px",padding:"3px 0",minWidth:"32px"}}>
+                          : <div style={{background:"#F1F5F9",borderRadius:"8px",padding:"3px 0"}}>
                               <span style={{fontSize:"11px",color:"#CBD5E1"}}>—</span>
                             </div>
                         }
@@ -1148,9 +1221,9 @@ function Supervisor() {
 
           {/* Leyenda */}
           <div style={{background:"#F8FAFF",borderRadius:"12px",padding:"10px 14px",marginTop:"8px"}}>
-            <p style={{fontSize:"10px",fontWeight:"700",color:"#94A3B8",margin:"0 0 4px 0",textTransform:"uppercase"}}>Leyenda</p>
+            <p style={{fontSize:"10px",fontWeight:"700",color:"#94A3B8",margin:"0 0 4px 0",textTransform:"uppercase"}}>Leyenda · Toca cualquier fila para ver detalle</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-              {HOJAS.map(h => (
+              {HOJAS.map(h=>(
                 <span key={h.key} style={{fontSize:"11px",color:"#475569"}}>{h.icon} {h.label}</span>
               ))}
             </div>
@@ -1158,7 +1231,6 @@ function Supervisor() {
         </div>
       )}
 
-      {/* Sin datos */}
       {resumen && !loading && Object.keys(resumen).length === 0 && (
         <div style={{background:"white",borderRadius:"16px",padding:"30px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
           <p style={{fontSize:"32px",margin:"0 0 8px 0"}}>📭</p>
@@ -1169,17 +1241,6 @@ function Supervisor() {
     </div>
   );
 }
-
-// ── APP PRINCIPAL ──────────────────────────────────────────────────────────
-const TABS = [
-  {id:"dash",  i:"🏠", l:"Inicio"},
-  {id:"asist", i:"🕐", l:"Asistencia"},
-  {id:"activ", i:"📸", l:"Actividades"},
-  {id:"masivo",i:"🏷️", l:"Precios"},
-  {id:"inv",   i:"📦", l:"Inventario"},
-  {id:"aver",  i:"⚠️", l:"Averías"},
-  {id:"super", i:"👔", l:"Supervisor"},
-];
 
 // ── STORAGE ────────────────────────────────────────────────────────────────
 const STORE_KEY = "unimares_v1";
