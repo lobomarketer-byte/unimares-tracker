@@ -18,12 +18,20 @@
 <div id="root"></div>
 <script type="text/babel">
 window.onerror = function(msg, src, line, col, err) {
-  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;background:#fff;color:#c00">' +
-    '<h2>Error detectado:</h2>' +
-    '<p>' + msg + '</p>' +
-    '<p>Linea: ' + line + ', Col: ' + col + '</p>' +
-    '<p>' + (err ? err.stack : '') + '</p>' +
-    '</div>';
+  if (line === 0) {
+    document.body.innerHTML = '<div style="padding:20px;font-family:sans-serif;background:#fff">' +
+      '<h2 style="color:#c00">Error de carga de CDN</h2>' +
+      '<p>React: ' + (typeof React !== "undefined" ? "✅" : "❌") + '</p>' +
+      '<p>ReactDOM: ' + (typeof ReactDOM !== "undefined" ? "✅" : "❌") + '</p>' +
+      '<p>Babel: ' + (typeof Babel !== "undefined" ? "✅" : "❌") + '</p>' +
+      '<p style="color:#666;font-size:12px">Fuente del error: ' + src + '</p>' +
+      '</div>';
+  } else {
+    document.body.innerHTML = '<div style="padding:20px;font-family:monospace;background:#fff;color:#c00">' +
+      '<h2>Error JS:</h2><p>' + msg + '</p>' +
+      '<p>Linea: ' + line + ' Col: ' + col + '</p>' +
+      '<pre>' + (err ? err.stack : '') + '</pre></div>';
+  }
 };
 const { useState, useCallback } = React;
 
