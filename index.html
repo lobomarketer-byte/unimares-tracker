@@ -19,7 +19,7 @@
 <script type="text/babel">
 const { useState, useCallback } = React;
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyGJY-8PhZFBRtEIdtbu4f7e9lxCVTSn0D1MZ-HkYr7IGRzrV1cgz3DxYwlMWZr5a5jag/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymo_tXc4NV-HrHkjjmadL6GSzwoSSnTRyiX-tzfsULSZ6wyAZlmhDeGAWBbKnNk2NYMQ/exec";
 
 const ALMACENES = ["Éxito Ibagué Centro","Éxito Ibagué Norte","Jumbo Ibagué","Carulla La Estación","Mercacentro No. 10","Olímpica Ibagué","Populares","Surtiplaza La 37","Surtiplaza Acqua","Surtiplaza El Salado"];
 const MERCS = [{id:1,nombre:"Ruby Gracia",almacen:"Todos",rol:"Mercaderista"},{id:2,nombre:"Mercadeo 1",almacen:"",rol:"Mercaderista"},{id:3,nombre:"Mercadeo 2",almacen:"",rol:"Mercaderista"},{id:4,nombre:"Supervisor / Jefe",almacen:"Todos",rol:"Supervisor"}];
@@ -829,21 +829,43 @@ function Supervisor() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
 
-  const cargar = async () => {
+  const cargar = () => {
     setLoading(true);
     setError(null);
     setResumen(null);
-    try {
-      const url = SCRIPT_URL + "?fecha=" + fecha;
-      const res = await fetch(url, {redirect:"follow"});
-      const text = await res.text();
-      const json = JSON.parse(text);
+
+    // Usamos JSONP para evitar bloqueo CORS de Google
+    const cbName = "cb_" + Date.now();
+    const script = document.createElement("script");
+    const url = SCRIPT_URL + "?fecha=" + fecha + "&callback=" + cbName;
+
+    const timer = setTimeout(() => {
+      cleanup();
+      setLoading(false);
+      setError("Tiempo agotado. Verifica que el Apps Script esté publicado como 'Cualquier persona'.");
+    }, 10000);
+
+    const cleanup = () => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    };
+
+    window[cbName] = (json) => {
+      cleanup();
+      setLoading(false);
       if (json.status === "ok") setResumen(json.resumen);
-      else setError(json.msg || "Error al cargar");
-    } catch(e) {
-      setError("Error: " + e.message + ". Verifica que el Apps Script esté publicado.");
-    }
-    setLoading(false);
+      else setError(json.msg || "Error al leer Sheets");
+    };
+
+    script.onerror = () => {
+      cleanup();
+      setLoading(false);
+      setError("No se pudo conectar con Google Sheets.");
+    };
+
+    script.src = url;
+    document.head.appendChild(script);
   };
 
   React.useEffect(() => { cargar(); }, []);
