@@ -835,12 +835,13 @@ function Supervisor() {
     setResumen(null);
     try {
       const url = SCRIPT_URL + "?fecha=" + fecha;
-      const res = await fetch(url);
-      const json = await res.json();
+      const res = await fetch(url, {redirect:"follow"});
+      const text = await res.text();
+      const json = JSON.parse(text);
       if (json.status === "ok") setResumen(json.resumen);
       else setError(json.msg || "Error al cargar");
     } catch(e) {
-      setError("No se pudo conectar. Verifica tu internet.");
+      setError("Error: " + e.message + ". Verifica que el Apps Script esté publicado.");
     }
     setLoading(false);
   };
@@ -1038,13 +1039,13 @@ function App() {
           {tab==="aver"   && <Averias data={av} setData={setAv}/>}
           {tab==="super"  && <Supervisor/>}
         </div>
-        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(12px)",borderTop:"1px solid #E8EDF8",padding:"8px 4px",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)"}}>
-          <div style={{display:"flex",justifyContent:"space-around",maxWidth:"420px",margin:"0 auto"}}>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(12px)",borderTop:"1px solid #E8EDF8",padding:"6px 4px",zIndex:100,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)"}}>
+          <div style={{display:"flex",justifyContent:"space-around",maxWidth:"420px",margin:"0 auto",overflowX:"auto",gap:"2px"}}>
             {TABS.map(t => (
               <button key={t.id} onClick={()=>setTab(t.id)}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",padding:"6px 8px",borderRadius:"12px",border:"none",cursor:"pointer",background:tab===t.id?"#EEF2FF":"transparent",transition:"all 0.15s",fontFamily:"inherit"}}>
-                <span style={{fontSize:"20px",lineHeight:1}}>{t.i}</span>
-                <span style={{fontSize:"10px",fontWeight:"700",color:tab===t.id?"#3B6FE8":"#94A3B8"}}>{t.l}</span>
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1px",padding:"5px 6px",borderRadius:"10px",border:"none",cursor:"pointer",background:tab===t.id?"#EEF2FF":"transparent",transition:"all 0.15s",fontFamily:"inherit",flexShrink:0}}>
+                <span style={{fontSize:"18px",lineHeight:1}}>{t.i}</span>
+                <span style={{fontSize:"9px",fontWeight:"700",color:tab===t.id?"#3B6FE8":"#94A3B8"}}>{t.l}</span>
               </button>
             ))}
           </div>
