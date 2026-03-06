@@ -27,6 +27,18 @@ const PRODS = ["Camarón Jumbo x 350g (Cód.24)","Camarón Hogar x 350g (Cód.22
 const COMP = ["Rico Mar","Cinco Sierras","Vitamar","Antillana","Ancla y Viento","Marca Blanca"];
 const HOY = () => new Date().toISOString().split("T")[0];
 const HORA = () => new Date().toTimeString().slice(0,5);
+const TIMESTAMP = () => {
+  const now = new Date();
+  // Colombia is UTC-5
+  const col = new Date(now.getTime() - 5*60*60*1000);
+  const d = col.toISOString();
+  const fecha = d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4);
+  let h = col.getUTCHours();
+  const m = String(col.getUTCMinutes()).padStart(2,"0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return fecha+" "+String(h).padStart(2,"0")+":"+m+" "+ampm;
+};
 
 // ── ENVIAR A GOOGLE SHEETS ─────────────────────────────────────────────────
 async function enviarASheets(modulo, campos) {
@@ -239,7 +251,7 @@ function Asistencia({data, setData}) {
     const campos = {
       Fecha: f.fecha, Mercaderista: f.merc, Almacen: f.almacen,
       HoraEntrada: f.entrada, HoraSalida: f.salida||"—",
-      Firma: f.firma?"Sí":"No", Observaciones: f.obs, Timestamp: new Date().toISOString()
+      Firma: f.firma?"Sí":"No", Observaciones: f.obs, Timestamp: TIMESTAMP()
     };
     const ok = await enviarASheets("Asistencia", campos);
     setLoading(false);
@@ -301,7 +313,7 @@ function Actividades({data, setData}) {
       Fecha: f.fecha, Hora: f.hora, Mercaderista: f.merc, Almacen: f.almacen,
       TipoActividad: f.tipo, Descripcion: f.desc,
       EsCompetencia: f.esComp?"Sí":"No", MarcaCompetencia: f.marcaComp||"—",
-      FotoAdjunta: f.foto?"Sí":"No", Timestamp: new Date().toISOString()
+      FotoAdjunta: f.foto?"Sí":"No", Timestamp: TIMESTAMP()
     };
     const ok = await enviarASheets("Actividades", campos);
     setLoading(false);
@@ -366,7 +378,7 @@ function Precios({data, setData}) {
       Producto: f.prod, PrecioUnimares: f.pU, PrecioCompetencia: f.pC||"—",
       MarcaCompetencia: f.marca||"—", Diferencia: diff!==null?diff:"—",
       Resultado: diff!==null?(diff<0?"Competitivo":"Más caro"):"—",
-      EnOferta: f.oferta?"Sí":"No", Observaciones: f.obs, Timestamp: new Date().toISOString()
+      EnOferta: f.oferta?"Sí":"No", Observaciones: f.obs, Timestamp: TIMESTAMP()
     };
     const ok = await enviarASheets("Precios", campos);
     setLoading(false);
@@ -443,7 +455,7 @@ function Inventario({data, setData}) {
       Fecha: f.fecha, Mercaderista: f.merc, Almacen: f.almacen,
       Producto: f.prod, StockActual: f.stock, StockMinimo: f.stockMin||"—",
       UnidadesVendidas: f.vendidas||"—", AlertaBajoStock: bajo?"⚠️ SÍ":"No",
-      Observaciones: f.obs, Timestamp: new Date().toISOString()
+      Observaciones: f.obs, Timestamp: TIMESTAMP()
     };
     const ok = await enviarASheets("Inventario", campos);
     setLoading(false);
@@ -525,7 +537,7 @@ function Averias({data, setData}) {
       Fecha: f.fecha, Hora: f.hora, Mercaderista: f.merc, Almacen: f.almacen,
       Producto: f.prod, Categoria: f.cat, Cantidad: f.cant||0,
       ValorEstimado: f.valor||0, Descripcion: f.desc, AccionTomada: f.accion||"—",
-      Timestamp: new Date().toISOString()
+      Timestamp: TIMESTAMP()
     };
     const ok = await enviarASheets("Averias", campos);
     setLoading(false);
@@ -648,7 +660,7 @@ function ChequeoMasivo({data, setData}) {
         Antillana: precios[prod]["Antillana"] || "—",
         AnclaYViento: precios[prod]["Ancla y Viento"] || "—",
         MarcaBlanca: precios[prod]["Marca Blanca"] || "—",
-        Timestamp: new Date().toISOString()
+        Timestamp: TIMESTAMP()
       };
       await enviarASheets("ChequeoMasivo", campos);
       enviados++;
@@ -812,10 +824,10 @@ function ChequeoMasivo({data, setData}) {
 
 // ── APP PRINCIPAL ──────────────────────────────────────────────────────────
 const TABS = [
-  {id:"dash",  i:"📊", l:"Inicio"},
+  {id:"dash",  i:"🏠", l:"Inicio"},
   {id:"asist", i:"🕐", l:"Asistencia"},
   {id:"activ", i:"📸", l:"Actividades"},
-  {id:"masivo",i:"📊", l:"Precios"},
+  {id:"masivo",i:"🏷️", l:"Precios"},
   {id:"inv",   i:"📦", l:"Inventario"},
   {id:"aver",  i:"⚠️", l:"Averías"},
 ];
@@ -829,9 +841,25 @@ function App() {
   const [inv, setInv] = useState([]);
   const [av, setAv] = useState([]);
 
+  const fechaHoy = () => {
+    const d = new Date();
+    return d.toLocaleDateString("es-CO", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+  };
   return (
     <div style={{minHeight:"100vh",background:"#F0F4FF",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       <div style={{maxWidth:"420px",margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+        {/* Top bar con fecha */}
+        <div style={{background:"linear-gradient(135deg,#0F2167,#1a3a8f)",padding:"10px 16px 8px",position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 12px rgba(15,33,103,0.3)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+              <span style={{fontSize:"20px"}}>🐟</span>
+              <span style={{color:"white",fontWeight:"900",fontSize:"14px",letterSpacing:"-0.3px"}}>UNIMARES</span>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <p style={{color:"#93C5FD",fontSize:"11px",margin:0,fontWeight:"600",textTransform:"capitalize"}}>{fechaHoy()}</p>
+            </div>
+          </div>
+        </div>
         <div style={{flex:1,overflowY:"auto",padding:"16px 12px 100px"}}>
           {tab==="dash"   && <Dashboard as={as} ac={ac} pr={pr} inv={inv} av={av}/>}
           {tab==="asist"  && <Asistencia data={as} setData={setAs}/>}
