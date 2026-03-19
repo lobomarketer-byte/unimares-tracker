@@ -19,7 +19,7 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwETa6FN3QEWocrTRxVU34puuzgfTLu4kPfeExlfAPQwKfhqzpIc8t-vES8vfIvWHLR9Q/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxjyhFxLbClQVWZZlJ2KL7UNRLl6gtDopkLLsRE7YiL0ya8tOeS_Q_UCYCxAGmDFQl_RQ/exec";
 
 // ── CONSTANTES ─────────────────────────────────────────────────────────────
 const USUARIOS = [
@@ -647,28 +647,21 @@ function Supervisor() {
 
   const cargar = () => {
     setLoading(true); setError(null); setResumen(null);
-    const cbName = "uniCb" + Date.now();
-    const url = SCRIPT_URL + "?fecha=" + fecha + "&callback=" + cbName;
-    const script = document.createElement("script");
-    script.src = url;
-    const timer = setTimeout(() => {
-      cleanup(); setLoading(false); setError("Tiempo agotado.");
-    }, 12000);
-    const cleanup = () => {
-      try { delete window[cbName]; } catch(e) {}
-      try { if (script.parentNode) document.body.removeChild(script); } catch(e) {}
-      clearTimeout(timer);
-    };
-    window[cbName] = (json) => {
-      cleanup(); setLoading(false);
-      if (json && json.status === "ok") setResumen(json.resumen);
-      else setError((json && json.msg) || "Error al leer Sheets");
-    };
-    script.onerror = () => { cleanup(); setLoading(false); setError("No se pudo conectar."); };
-    document.body.appendChild(script);
+    const url = SCRIPT_URL + "?fecha=" + fecha;
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        setLoading(false);
+        if (json && json.status === "ok") setResumen(json.resumen);
+        else setError((json && json.msg) || "Error al leer Sheets");
+      })
+      .catch(function(err) {
+        setLoading(false);
+        setError("No se pudo conectar: " + err.message);
+      });
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(function() { cargar(); }, [fecha]);
 
   const HOJAS = ["Asistencia","Actividades","ChequeoMasivo","Inventario","Averias"];
   const EMOJIS = {Asistencia:"🕐",Actividades:"📸",ChequeoMasivo:"🏷️",Inventario:"📦",Averias:"⚠️"};
