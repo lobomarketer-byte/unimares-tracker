@@ -214,32 +214,48 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
   useEffect(function() {
     if (!esSup) return;
     setLoadingSup(true);
-    fetch(SCRIPT_URL + "?fecha=" + h)
-      .then(function(r) { return r.json(); })
-      .then(function(json) {
-        setLoadingSup(false);
-        if (json && json.status === "ok") {
-          console.log("Dashboard Sheets data:", JSON.stringify(json.resumen));
-          setSheetsData(json.resumen);
-        } else {
-          console.log("Dashboard Sheets error:", JSON.stringify(json));
-        }
-      })
-      .catch(function(err) { 
-        setLoadingSup(false); 
-        console.log("Dashboard fetch error:", err.message);
+    // Fetch ultimos 7 dias
+    var fechas = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      fechas.push(d.toISOString().split("T")[0]);
+    }
+    var promesas = fechas.map(function(f) {
+      return fetch(SCRIPT_URL + "?fecha=" + f)
+        .then(function(r) { return r.json(); })
+        .then(function(json) { return {fecha: f, resumen: (json && json.status === "ok") ? json.resumen : {}}; })
+        .catch(function() { return {fecha: f, resumen: {}}; });
+    });
+    Promise.all(promesas).then(function(resultados) {
+      setLoadingSup(false);
+      // Consolidar: por mercaderista, total de cada modulo en 7 dias
+      var consolidado = {};
+      var porDia = {};
+      resultados.forEach(function(r) {
+        porDia[r.fecha] = r.resumen;
+        Object.keys(r.resumen).forEach(function(merc) {
+          if (!consolidado[merc]) consolidado[merc] = {Asistencia:0,Actividades:0,Precios:0,ChequeoMasivo:0,Inventario:0,Averias:0,diasActivo:0};
+          consolidado[merc].diasActivo++;
+          Object.keys(r.resumen[merc]).forEach(function(mod) {
+            consolidado[merc][mod] = (consolidado[merc][mod]||0) + r.resumen[merc][mod];
+          });
+        });
       });
+      setSheetsData({consolidado: consolidado, porDia: porDia, fechas: fechas});
+    });
   }, []);
 
   const alertas = inv.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
 
   // Si es supervisor usa datos de Sheets, si no usa localStorage
   var presHoy, actHoy, invHoy, precHoy;
-  if (esSup && sheetsData) {
-    presHoy = Object.values(sheetsData).filter(d => d["Asistencia"] > 0).length;
-    actHoy  = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Actividades"]||0); }, 0);
-    invHoy  = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Inventario"]||0); }, 0);
-    precHoy = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Precios"]||0) + (d["ChequeoMasivo"]||0); }, 0);
+  var consolidado = (esSup && sheetsData && sheetsData.consolidado) ? sheetsData.consolidado : null;
+  var hoySheets = (esSup && sheetsData && sheetsData.porDia) ? (sheetsData.porDia[h] || {}) : null;
+  if (consolidado) {
+    presHoy = Object.values(hoySheets).filter(function(d){ return d["Asistencia"] > 0; }).length;
+    actHoy  = Object.values(consolidado).reduce(function(a,d){ return a + (d["Actividades"]||0); }, 0);
+    invHoy  = Object.values(consolidado).reduce(function(a,d){ return a + (d["Inventario"]||0); }, 0);
+    precHoy = Object.values(consolidado).reduce(function(a,d){ return a + (d["Precios"]||0) + (d["ChequeoMasivo"]||0); }, 0);
   } else {
     presHoy = as.filter(r => r.fecha===h).length;
     actHoy  = ac.filter(r => r.fecha===h).length;
@@ -306,12 +322,13 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
         <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo Hoy {loadingSup && <span style={{fontSize:"10px",color:"#94A3B8",fontWeight:"400"}}>cargando...</span>}</h3>
         {MERCS.map(m => {
           var a, nA, nP, nI;
-          if (esSup && sheetsData) {
-            const d = sheetsData[m.nombre] || {};
-            a = d["Asistencia"] > 0;
-            nA = d["Actividades"] || 0;
-            nP = (d["Precios"] || 0) + (d["ChequeoMasivo"] || 0);
-            nI = d["Inventario"] || 0;
+          if (consolidado) {
+            const dHoy = hoySheets[m.nombre] || {};
+            const d7 = consolidado[m.nombre] || {};
+            a = dHoy["Asistencia"] > 0;
+            nA = d7["Actividades"] || 0;
+            nP = (d7["Precios"] || 0) + (d7["ChequeoMasivo"] || 0);
+            nI = d7["Inventario"] || 0;
           } else {
             a = as.find(r => r.merc===m.nombre && r.fecha===h);
             nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
@@ -347,6 +364,44 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
             </div>
           ))}
         </div>
+      )}
+
+      {esSup && consolidado && (
+        <Card>
+          <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 14px 0"}}>📊 Resumen 7 Días — Equipo</h3>
+          {loadingSup && <p style={{color:"#94A3B8",fontSize:"12px",textAlign:"center"}}>Cargando desde Sheets...</p>}
+          {MERCS.filter(m=>m.rol==="Mercaderista").map(function(m) {
+            const d = consolidado[m.nombre] || {};
+            const total = Object.values(d).reduce(function(a,v){ return typeof v==="number"?a+v:a; },0) - (d.diasActivo||0);
+            const dias = d.diasActivo || 0;
+            return (
+              <div key={m.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                  <p style={{fontWeight:"800",fontSize:"13px",color:"#1a2240",margin:0}}>{m.nombre}</p>
+                  <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                    <span style={{fontSize:"10px",fontWeight:"700",color:"#6B7B9E"}}>{dias} días</span>
+                    <div style={{background:total>0?"#EEF2FF":"#F8FAFF",borderRadius:"8px",padding:"3px 10px"}}>
+                      <span style={{fontSize:"12px",fontWeight:"900",color:total>0?"#3B6FE8":"#CBD5E1"}}>{total} regs</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                  {[["🕐","Asistencia"],["📸","Actividades"],["🏷️","Precios"],["📦","Inventario"],["⚠️","Averias"]].map(function(arr) {
+                    const ic=arr[0]; const mod=arr[1];
+                    const v = (d[mod]||0) + (mod==="Precios"?(d["ChequeoMasivo"]||0):0);
+                    if (!v) return null;
+                    return (
+                      <div key={mod} style={{background:"#EEF2FF",borderRadius:"8px",padding:"3px 8px",display:"flex",gap:"4px",alignItems:"center"}}>
+                        <span style={{fontSize:"11px"}}>{ic}</span>
+                        <span style={{fontSize:"11px",fontWeight:"800",color:"#3B6FE8"}}>{v}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
       )}
 
       <Card>
