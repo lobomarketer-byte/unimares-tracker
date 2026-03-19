@@ -205,13 +205,39 @@ function Login({onLogin}) {
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
-function Dashboard({as, ac, pr, inv, av, limpiar}) {
+function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
   const h = HOY();
+  const esSup = usuario && usuario.rol === "supervisor";
+  const [sheetsData, setSheetsData] = useState(null);
+  const [loadingSup, setLoadingSup] = useState(false);
+
+  useEffect(function() {
+    if (!esSup) return;
+    setLoadingSup(true);
+    fetch(SCRIPT_URL + "?fecha=" + h)
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        setLoadingSup(false);
+        if (json && json.status === "ok") setSheetsData(json.resumen);
+      })
+      .catch(function() { setLoadingSup(false); });
+  }, []);
+
   const alertas = inv.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
-  const presHoy = as.filter(r => r.fecha===h).length;
-  const actHoy  = ac.filter(r => r.fecha===h).length;
-  const invHoy  = inv.filter(r => r.fecha===h).length;
-  const precHoy = pr.filter(r => r.fecha===h).length;
+
+  // Si es supervisor usa datos de Sheets, si no usa localStorage
+  var presHoy, actHoy, invHoy, precHoy;
+  if (esSup && sheetsData) {
+    presHoy = Object.values(sheetsData).filter(d => d["Asistencia"] > 0).length;
+    actHoy  = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Actividades"]||0); }, 0);
+    invHoy  = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Inventario"]||0); }, 0);
+    precHoy = Object.values(sheetsData).reduce(function(a,d){ return a + (d["Precios"]||0) + (d["ChequeoMasivo"]||0); }, 0);
+  } else {
+    presHoy = as.filter(r => r.fecha===h).length;
+    actHoy  = ac.filter(r => r.fecha===h).length;
+    invHoy  = inv.filter(r => r.fecha===h).length;
+    precHoy = pr.filter(r => r.fecha===h).length;
+  }
   const totalMercs = MERCS.filter(m => m.rol==="Mercaderista").length;
 
   const ultimos7 = Array.from({length:7}, (_,i) => {
@@ -269,12 +295,21 @@ function Dashboard({as, ac, pr, inv, av, limpiar}) {
       </Card>
 
       <Card>
-        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo Hoy</h3>
+        <h3 style={{color:"#0F2167",fontWeight:"900",fontSize:"12px",textTransform:"uppercase",letterSpacing:"0.07em",margin:"0 0 12px 0"}}>👥 Equipo Hoy {loadingSup && <span style={{fontSize:"10px",color:"#94A3B8",fontWeight:"400"}}>cargando...</span>}</h3>
         {MERCS.map(m => {
-          const a = as.find(r => r.merc===m.nombre && r.fecha===h);
-          const nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
-          const nP = pr.filter(r => r.merc===m.nombre && r.fecha===h).length;
-          const nI = inv.filter(r => r.merc===m.nombre && r.fecha===h).length;
+          var a, nA, nP, nI;
+          if (esSup && sheetsData) {
+            const d = sheetsData[m.nombre] || {};
+            a = d["Asistencia"] > 0;
+            nA = d["Actividades"] || 0;
+            nP = (d["Precios"] || 0) + (d["ChequeoMasivo"] || 0);
+            nI = d["Inventario"] || 0;
+          } else {
+            a = as.find(r => r.merc===m.nombre && r.fecha===h);
+            nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
+            nP = pr.filter(r => r.merc===m.nombre && r.fecha===h).length;
+            nI = inv.filter(r => r.merc===m.nombre && r.fecha===h).length;
+          }
           return (
             <div key={m.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
@@ -887,7 +922,7 @@ function App() {
           </div>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"16px 12px 100px"}}>
-          {tab==="dash"  && <Dashboard as={as} ac={ac} pr={pr} inv={inv} av={av} limpiar={limpiar}/>}
+          {tab==="dash"  && <Dashboard as={as} ac={ac} pr={pr} inv={inv} av={av} limpiar={limpiar} usuario={usuario}/>}
           {tab==="asist" && <Asistencia data={as} setData={setAs}/>}
           {tab==="activ" && <Actividades data={ac} setData={setAc}/>}
           {tab==="prec"  && <Precios data={pr} setData={setPr}/>}
