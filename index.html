@@ -218,9 +218,17 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
       .then(function(r) { return r.json(); })
       .then(function(json) {
         setLoadingSup(false);
-        if (json && json.status === "ok") setSheetsData(json.resumen);
+        if (json && json.status === "ok") {
+          console.log("Dashboard Sheets data:", JSON.stringify(json.resumen));
+          setSheetsData(json.resumen);
+        } else {
+          console.log("Dashboard Sheets error:", JSON.stringify(json));
+        }
       })
-      .catch(function() { setLoadingSup(false); });
+      .catch(function(err) { 
+        setLoadingSup(false); 
+        console.log("Dashboard fetch error:", err.message);
+      });
   }, []);
 
   const alertas = inv.filter(r => r.stockMin && Number(r.stock) <= Number(r.stockMin));
