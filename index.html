@@ -57,6 +57,22 @@ try {
   const s = loadStore();
   if (s.session && !s.session.rol) { s.session = null; localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
 } catch(e) {}
+
+// Migrar datos viejos: normalizar fecha y merc a minuscula
+try {
+  const s = loadStore();
+  var migrado = false;
+  ["asistencia","actividades","inventario","averias","precios"].forEach(function(k) {
+    if (!s[k]) return;
+    s[k] = s[k].map(function(r) {
+      var updated = Object.assign({}, r);
+      if (!updated.fecha && updated.Fecha) { updated.fecha = updated.Fecha; migrado = true; }
+      if (!updated.merc && updated.Mercaderista) { updated.merc = updated.Mercaderista; migrado = true; }
+      return updated;
+    });
+  });
+  if (migrado) localStorage.setItem(STORE_KEY, JSON.stringify(s));
+} catch(e) {}
 const saveStore = (k, v) => { try { const s = loadStore(); s[k]=v; localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} };
 function usePersistedState(key, def) {
   const [val, setVal] = useState(() => { const s = loadStore(); return s[key] !== undefined ? s[key] : def; });
@@ -333,7 +349,7 @@ function Asistencia({data, setData}) {
     const campos = {Fecha:fecha, Mercaderista:merc, Almacen:almacen, HoraEntrada:horaE, HoraSalida:horaS, Firma:firma, Observaciones:obs, Timestamp:TIMESTAMP()};
     const ok = await enviarASheets("Asistencia", campos);
     setLoading(false);
-    if (ok) { setData(prev => [...prev, {...campos, id:Date.now()}]); setFirma(""); setObs(""); setHoraS(""); showToast("Asistencia guardada", true); }
+    if (ok) { setData(prev => [...prev, {...campos, id:Date.now(), merc:merc, fecha:fecha}]); setFirma(""); setObs(""); setHoraS(""); showToast("Asistencia guardada", true); }
     else showToast("Error al guardar", false);
   };
 
@@ -601,7 +617,7 @@ function Averias({data, setData}) {
     const campos = {Fecha:fecha, Hora:HORA(), Mercaderista:merc, Almacen:almacen, Producto:prod, Categoria:cat, Cantidad:cant, ValorEstimado:valor, Descripcion:desc, AccionTomada:accion, Timestamp:TIMESTAMP()};
     const ok = await enviarASheets("Averias", campos);
     setLoading(false);
-    if (ok) { setData(prev=>[...prev,{...campos,id:Date.now()}]); setProd(""); setCat(""); setCant(""); setValor(""); setDesc(""); setAccion(""); showToast("Averia registrada", true); }
+    if (ok) { setData(prev=>[...prev,{...campos,id:Date.now(), fecha:fecha, merc:merc}]); setProd(""); setCat(""); setCant(""); setValor(""); setDesc(""); setAccion(""); showToast("Averia registrada", true); }
     else showToast("Error al guardar", false);
   };
 
