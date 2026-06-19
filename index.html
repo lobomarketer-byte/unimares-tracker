@@ -4,10 +4,15 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Unimares Tracker — Gestión Mercaderistas</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  window.onerror = function(msg, src, line, col, err) {
+    document.getElementById('root').innerHTML = '<div style="font-family:sans-serif;padding:32px;color:#DC2626;background:#FEF2F2;border-radius:12px;margin:24px;"><h2>Error al cargar la app</h2><p><b>'+msg+'</b></p><p>Línea '+line+'</p><p>Recarga la página o revisa la consola (F12).</p></div>';
+  };
+</script>
 <style>
   * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
   body { margin: 0; background: #F0F4FF; }
@@ -51,7 +56,17 @@ const TIMESTAMP = () => {
 
 // ── STORAGE ────────────────────────────────────────────────────────────────
 const STORE_KEY = "unimares_v1";
-const loadStore = () => { try { const r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : {}; } catch(e) { return {}; } };
+const loadStore = () => { 
+  try { 
+    const r = localStorage.getItem(STORE_KEY); 
+    if (!r) return {};
+    const parsed = JSON.parse(r);
+    return (parsed && typeof parsed === "object") ? parsed : {};
+  } catch(e) { 
+    try { localStorage.removeItem(STORE_KEY); } catch(e2) {}
+    return {}; 
+  } 
+};
 // Limpiar sesion invalida (sin rol)
 try {
   const s = loadStore();
@@ -73,10 +88,20 @@ try {
   });
   if (migrado) localStorage.setItem(STORE_KEY, JSON.stringify(s));
 } catch(e) {}
-const saveStore = (k, v) => { try { const s = loadStore(); s[k]=v; localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch(e) {} };
+const saveStore = (k, v) => { 
+  try { 
+    const s = loadStore(); 
+    s[k] = v; 
+    localStorage.setItem(STORE_KEY, JSON.stringify(s)); 
+    return true;
+  } catch(e) { 
+    console.warn("Storage error:", e);
+    return false;
+  } 
+};
 function usePersistedState(key, def) {
   const [val, setVal] = useState(() => { const s = loadStore(); return s[key] !== undefined ? s[key] : def; });
-  useEffect(() => { saveStore(key, val); }, [val]);
+  useEffect(() => { saveStore(key, val); }, [key, val]);
   return [val, setVal];
 }
 
@@ -257,10 +282,10 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
     invHoy  = Object.values(consolidado).reduce(function(a,d){ return a + (d["Inventario"]||0); }, 0);
     precHoy = Object.values(consolidado).reduce(function(a,d){ return a + (d["Precios"]||0) + (d["ChequeoMasivo"]||0); }, 0);
   } else {
-    presHoy = as.filter(r => r.fecha===h).length;
-    actHoy  = ac.filter(r => r.fecha===h).length;
-    invHoy  = inv.filter(r => r.fecha===h).length;
-    precHoy = pr.filter(r => r.fecha===h).length;
+    presHoy = as.filter(r => (r.fecha||r.Fecha)===h).length;
+    actHoy  = ac.filter(r => (r.fecha||r.Fecha)===h).length;
+    invHoy  = inv.filter(r => (r.fecha||r.Fecha)===h).length;
+    precHoy = pr.filter(r => (r.fecha||r.Fecha)===h).length;
   }
   const totalMercs = MERCS.filter(m => m.rol==="Mercaderista").length;
 
@@ -268,7 +293,7 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
     const d = new Date(); d.setDate(d.getDate()-6+i);
     const key = d.toISOString().split("T")[0];
     const dias = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
-    return {l:dias[d.getDay()], v:ac.filter(r=>r.fecha===key).length};
+    return {l:dias[d.getDay()], v:ac.filter(r=>(r.fecha||r.Fecha)===key).length};
   });
   const maxV = Math.max(...ultimos7.map(d=>d.v), 1);
 
@@ -288,7 +313,7 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginTop:"16px",position:"relative",zIndex:1}}>
-          {[["📸",actHoy,"Actividades"],["🏷️",precHoy,"Precios"],["⚠️",av.filter(r=>r.fecha===h).length,"Averías"]].map(([ic,v,l]) =>
+          {[["📸",actHoy,"Actividades"],["🏷️",precHoy,"Precios"],["⚠️",av.filter(r=>(r.fecha||r.Fecha)===h).length,"Averías"]].map(([ic,v,l]) =>
             <div key={l} style={{background:"rgba(255,255,255,0.12)",borderRadius:"12px",padding:"10px",textAlign:"center"}}>
               <div style={{fontSize:"20px"}}>{ic}</div>
               <div style={{color:"white",fontWeight:"900",fontSize:"22px",lineHeight:1}}>{v}</div>
@@ -330,10 +355,10 @@ function Dashboard({as, ac, pr, inv, av, limpiar, usuario}) {
             nP = (d7["Precios"] || 0) + (d7["ChequeoMasivo"] || 0);
             nI = d7["Inventario"] || 0;
           } else {
-            a = as.find(r => r.merc===m.nombre && r.fecha===h);
-            nA = ac.filter(r => r.merc===m.nombre && r.fecha===h).length;
-            nP = pr.filter(r => r.merc===m.nombre && r.fecha===h).length;
-            nI = inv.filter(r => r.merc===m.nombre && r.fecha===h).length;
+            a = as.find(r => r.merc===m.nombre && (r.fecha||r.Fecha)===h);
+            nA = ac.filter(r => r.merc===m.nombre && (r.fecha||r.Fecha)===h).length;
+            nP = pr.filter(r => r.merc===m.nombre && (r.fecha||r.Fecha)===h).length;
+            nI = inv.filter(r => r.merc===m.nombre && (r.fecha||r.Fecha)===h).length;
           }
           return (
             <div key={m.id} style={{padding:"10px 0",borderBottom:"1px solid #F0F4FF"}}>
@@ -922,7 +947,7 @@ function exportarPDF(resumen, fecha) {
     <p>Unimares — Unico, saludable y natural &nbsp;|&nbsp; Ibague, Colombia</p>
     <p>Reporte generado automaticamente desde Unimares Tracker</p>
   </div>
-  <scr" + "ipt>window.onload = function(){ window.print(); }</scr" + "ipt>
+  <${'script'}>window.onload = function(){ window.print(); }</${'script'}>
 </body>
 </html>`;
 
@@ -960,11 +985,11 @@ function App() {
   const limpiar = () => {
     const hoy = HOY();
     if (!confirm("Limpiar registros de dias anteriores?")) return;
-    setAs(p=>p.filter(r=>r.Fecha===hoy));
-    setAc(p=>p.filter(r=>r.Fecha===hoy));
-    setPr(p=>p.filter(r=>r.fecha===hoy));
-    setInv(p=>p.filter(r=>r.Fecha===hoy));
-    setAv(p=>p.filter(r=>r.Fecha===hoy));
+    setAs(p=>p.filter(r=>(r.fecha||r.Fecha)===hoy));
+    setAc(p=>p.filter(r=>(r.fecha||r.Fecha)===hoy));
+    setPr(p=>p.filter(r=>(r.fecha||r.Fecha)===hoy));
+    setInv(p=>p.filter(r=>(r.fecha||r.Fecha)===hoy));
+    setAv(p=>p.filter(r=>(r.fecha||r.Fecha)===hoy));
   };
 
   if (!usuario) return <Login onLogin={handleLogin}/>;
